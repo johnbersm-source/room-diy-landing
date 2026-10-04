@@ -165,11 +165,15 @@
       steps: ["선반·TV장 위에 세워 둔다(못 불필요)"] },
     bedding: { name: "침구 세트", size: "침대 크기에 맞춤", price: [40000, 120000], diff: "쉬움", min: 15, tools: "없음", keyword: "침구 세트 이불 커버",
       steps: ["침대 크기를 확인한다", "색을 방 분위기와 맞춘다"] },
+    cabinet: { name: "수납장·사이드보드", size: "폭 80~120cm, 깊이 35cm 이하", price: [150000, 400000], diff: "보통", min: 60, tools: "드라이버", keyword: "수납장 사이드보드 슬림",
+      steps: ["놓을 벽면의 폭과 콘센트 위치를 잰다", "조립 후 벽에 붙여 놓는다", "전도 방지 고정구를 사용한다(임대는 무타공 제품)"] },
+    lightSet: { name: "간접조명 세트", size: "스탠드 2~3개 또는 LED 바", price: [80000, 200000], diff: "쉬움", min: 20, tools: "없음", keyword: "간접조명 무드 스탠드 세트",
+      steps: ["콘센트 위치를 확인한다", "높낮이가 다른 2~3곳에 나눠 놓는다", "전구 색(전구색 2700~3000K)을 통일한다"] },
     mirror: { name: "스탠드 전신거울", size: "높이 150cm 안팎", price: [30000, 90000], diff: "쉬움", min: 10, tools: "없음", keyword: "스탠드 전신거울",
       steps: ["옷장 옆 벽에 기대어 둔다", "전도 방지 패드를 붙인다"] },
   };
-  const LIVING_EXTRAS = ["curtain", "cushion", "moodLamp", "plant", "sidetable", "ottoman", "frame"];
-  const BED_EXTRAS = ["bedding", "curtain", "mirror", "moodLamp", "plant"];
+  const LIVING_EXTRAS = ["curtain", "cushion", "moodLamp", "plant", "sidetable", "ottoman", "frame", "lightSet", "cabinet"];
+  const BED_EXTRAS = ["bedding", "curtain", "mirror", "moodLamp", "plant", "lightSet", "cabinet"];
   const RENTAL_SENSITIVE = ["shelf", "hanger", "bookcase", "curtain", "frame"];
   const mkItem = (key) => {
     const it = ITEM[key];
@@ -459,7 +463,7 @@
       if (budget == null || spent + mid <= budget) { spent += mid; inBudget.push(Object.assign({ mid }, it)); }
       else over.push(Object.assign({ mid }, it));
     });
-    return { inBudget, over, total: spent };
+    return { inBudget, over, total: spent, max: items.reduce((t, it) => t + Math.round((it.price[0] + it.price[1]) / 2), 0) };
   }
 
   function normalize(opts) {
@@ -524,7 +528,7 @@
       c.purchase.inBudget.forEach((it) => {
         const pid = pm[it.key];
         it.fit = pid ? (c.pieces.find((p) => p.id === pid) ? "이 방에서 놓을 자리를 확인했어요" : "놓을 자리를 찾지 못했어요. 더 작은 크기를 고려하세요")
-          : ["ottoman", "sidetable", "plant", "mirror"].includes(it.key) ? "바닥에 놓는 소품이에요. 놓을 자리를 직접 한 번 재보세요" : "놓을 공간을 거의 차지하지 않는 소품이에요";
+          : ["ottoman", "sidetable", "plant", "mirror", "cabinet"].includes(it.key) ? "바닥에 놓는 소품이에요. 놓을 자리를 직접 한 번 재보세요" : "놓을 공간을 거의 차지하지 않는 소품이에요";
       });
       c.rentalNote = opts.rental && c.items.some((k) => RENTAL_SENSITIVE.includes(k)) ? "임대: 못·타공 없이 쓰는 제품만 고르세요" : "";
       c.prompt = c.changes.join(". ") + ". " + FIXED_PROMPT;

@@ -55,6 +55,10 @@ textarea{width:100%;font:12px/1.5 ui-monospace,monospace;background:var(--bg);co
 .pri{outline:2px solid var(--acc)}
 .cta2{display:block;width:100%;text-align:center;background:var(--acc);color:#fff;border-radius:12px;padding:12px;margin:6px 0;text-decoration:none;font-weight:600;font-size:15px}
 @media(prefers-color-scheme:dark){.cta2{color:#0b2a1a}}
+.photobox{position:relative;display:block;max-width:100%;margin:8px 0}.photobox img{width:100%;border-radius:10px;display:block;cursor:crosshair}
+.pin{position:absolute;transform:translate(-50%,-50%);width:26px;height:26px;border-radius:50%;background:var(--bg);border:2px solid var(--acc);color:var(--acc);font-size:12px;font-weight:700;display:flex;align-items:center;justify-content:center;pointer-events:none}
+.pin.done{background:var(--acc);color:#fff}
+.afterbox{border:2px dashed var(--line);border-radius:10px;padding:14px;text-align:center;color:var(--mut);font-size:13px;margin:8px 0}
 .legend i{display:inline-block;width:12px;height:12px;border:1px solid var(--fg);vertical-align:middle;margin:0 4px 0 8px}
 #quote{margin-top:28px;border:2px solid var(--acc);border-radius:14px;padding:16px}
 #quote table{width:100%;border-collapse:collapse;font-size:14px}
@@ -121,7 +125,7 @@ textarea{width:100%;font:12px/1.5 ui-monospace,monospace;background:var(--bg);co
     <img id="preview" alt="" hidden>
   </div>
   <div class="row seg" id="budget"></div>
-  <div class="row" id="customBox" hidden>예산 <input id="customBudget" type="number" min="1" max="1000" step="1" value="40"> 만원</div>
+  <div class="row" id="customBox" hidden>예산 <input id="customBudget" type="number" min="1" max="100000" step="1" value="150"> 만원 <span class="mut" id="customBudgetWon"></span></div>
   <button class="cta" id="go" type="button">셀프 인테리어 추천 보기</button>
 
   <div id="out"></div>
@@ -261,7 +265,7 @@ function renderLock() {
 }
 function renderBudget() {
   $("#budget").innerHTML = BUDGETS.map((b) => `<button type="button" data-b="${b * 10000}" aria-pressed="${!st.customBudget && st.budget === b * 10000}">${b}만원</button>`).join("") +
-    `<button type="button" data-b="custom" aria-pressed="${st.customBudget}">직접 입력</button>`;
+    `<button type="button" data-b="custom" aria-pressed="${st.customBudget}">직접 입력 (100만원 초과 등)</button>`;
   $("#customBox").hidden = !st.customBudget;
 }
 function renderAll() {
@@ -299,18 +303,27 @@ document.addEventListener("click", (e) => {
   const lk = e.target.closest("#lockPlan [data-id]");
   if (lk) { const id = lk.dataset.id; st.locked.has(id) ? st.locked.delete(id) : st.locked.add(id); renderLock(); $("#out").innerHTML = ""; $("#quote").hidden = true; return; }
   const b = e.target.closest("#budget button");
-  if (b) { if (b.dataset.b === "custom") { st.customBudget = true; st.budget = Math.round(Number($("#customBudget").value) * 10000) || 0; }
+  if (b) { if (b.dataset.b === "custom") { st.customBudget = true; st.budget = Math.round(Number($("#customBudget").value) * 10000) || 0; showCustomWon(); }
     else { st.customBudget = false; st.budget = Number(b.dataset.b); } renderBudget(); return; }
 });
-$("#customBudget").addEventListener("input", (e) => { st.budget = Math.round(Number(e.target.value) * 10000) || 0; });
+const showCustomWon = () => { $("#customBudgetWon").textContent = st.budget > 0 ? `= ${won(st.budget)}` : ""; };
+$("#customBudget").addEventListener("input", (e) => { st.budget = Math.round(Number(e.target.value) * 10000) || 0; showCustomWon(); });
 ["#w", "#d"].forEach((s) => $(s).addEventListener("input", () => {
   const W = Number($("#w").value), D = Number($("#d").value);
   st.custom = W >= 200 && D >= 200 ? { W, D } : null; if (!st.touched) resetSizes(); renderAreas(); renderFurn(); renderLock(); }));
 $("#clearCustom").addEventListener("click", () => { st.custom = null; $("#w").value = ""; $("#d").value = ""; if (!st.touched) resetSizes(); renderAreas(); renderFurn(); renderLock(); });
 $("#rental").addEventListener("change", (e) => { st.rental = e.target.checked; });
-$("#photo").addEventListener("change", (e) => {
+function compress(file) {
+  return new Promise((res) => { const img = new Image(), url = URL.createObjectURL(file);
+    img.onload = () => { const k = Math.min(1, 900 / Math.max(img.width, img.height)), cv = document.createElement("canvas");
+      cv.width = Math.round(img.width * k); cv.height = Math.round(img.height * k); cv.getContext("2d").drawImage(img, 0, 0, cv.width, cv.height);
+      URL.revokeObjectURL(url); res(cv.toDataURL("image/jpeg", 0.72)); };
+    img.onerror = () => res(null); img.src = url; });
+}
+$("#photo").addEventListener("change", async (e) => {
   const f = e.target.files[0]; if (!f) return;
-  const img = $("#preview"); img.src = URL.createObjectURL(f); img.hidden = false;
+  st.photo = await compress(f);
+  const img = $("#preview"); if (st.photo) { img.src = st.photo; img.hidden = false; }
 });
 
 /* ---------- 결과와 견적서 ---------- */
@@ -339,7 +352,8 @@ $("#go").addEventListener("click", () => {
   const names = Object.fromEntries(E.currentScene(r, engineOpts()).pieces.map((p) => [p.id, p.label]));
   const lockNote = st.locked.size ? `<p class="mut">이동 불가: ${[...st.locked].map((id) => esc(names[id] || id)).join(", ")}</p>` : "";
   $("#out").innerHTML = `<h2>추천 (${esc(H().label)} ${esc(E.TARGETS[st.target].label)} · ${r.W}×${r.D}cm · 예산 ${won(st.budget)})</h2>
-    <p class="mut">현재 배치는 일반적인 구성으로 가정했어요. 실제와 다르면 위에서 가구 크기와 구조를 바꿔보세요.</p>${lockNote}` +
+    <p class="mut">현재 배치는 일반적인 구성으로 가정했어요. 실제와 다르면 위에서 가구 크기와 구조를 바꿔보세요.</p>${lockNote}
+    ${st.photo ? `<p class="mut">내 방 (Before)</p><img src="${st.photo}" alt="내 방 사진" style="max-width:100%;border-radius:10px">` : ""}` +
     (E.anyApplicable(cs) ? "" : `<p class="mut"><b>이동 불가로 지정한 가구 때문에 적용할 수 있는 안이 없어요.</b> 일부를 해제해보세요.</p>`) +
     (cs.some((c) => !c.blocked && c.purchase.total === 0 && c.score === best) && cs.some((c) => !c.blocked && c.items.length) ? `<p class="mut">💡 돈이 안 드는 재배치(B)부터 해보고, 분위기를 더 바꾸고 싶으면 A·C의 소품을 더하는 순서가 좋아요.</p>` : "") +
     cs.map((c) => {
@@ -347,7 +361,8 @@ $("#go").addEventListener("click", () => {
       const buy = c.items.length
         ? `<div class="buy"><b>구매 리스트</b> <span class="mut">합계 ${won(p.total)} / 예산 ${won(st.budget)} (임시 가정 가격)</span>
             ${p.inBudget.map((i) => itemHtml(i, false)).join("")}${p.over.map((i) => itemHtml(i, true)).join("")}
-            ${c.rentalNote ? `<p class="mut">${esc(c.rentalNote)}</p>` : ""}</div>`
+            ${c.rentalNote ? `<p class="mut">${esc(c.rentalNote)}</p>` : ""}
+            ${st.budget > p.max * 1.3 ? `<p class="mut">예산이 넉넉해요. 이 안의 최대 구성은 약 ${won(p.max)}이에요. 남는 예산은 큰 가구 교체(소파·침대 등)에 쓸 수 있어요(준비 중).</p>` : ""}</div>`
         : `<div class="buy"><b>구매 없이 가능</b><p class="mut">기존 가구만 옮기는 안입니다. 이동 순서: ${c.changes.map(esc).join(" → ")}</p></div>`;
       return `<div class="cand${c.blocked ? " blocked" : ""}"><h3>${c.id}. ${esc(c.title)} ${c.score === best && !c.blocked ? "· 가장 무난" : ""}<span class="score">${c.blocked ? "적용 불가" : c.score + "점"}</span></h3>
         <div class="mut">${esc(c.cost)}</div>
@@ -364,7 +379,9 @@ $("#go").addEventListener("click", () => {
 /* ---------- 앱에 보관되는 견적서 (PDF 없음) ---------- */
 const QKEY = "diy_quotes_v1";
 const loadQ = () => { try { return JSON.parse(localStorage.getItem(QKEY)) || []; } catch (e) { return []; } };
-const saveQ = (a) => { try { localStorage.setItem(QKEY, JSON.stringify(a)); } catch (e) {} };
+const saveQ = (a) => { try { localStorage.setItem(QKEY, JSON.stringify(a)); return true; } catch (e) { return false; } };
+const photoOf = (id) => { try { return localStorage.getItem("diy_photo_" + id); } catch (e) { return null; } };
+const savePhoto = (id, data) => { try { localStorage.setItem("diy_photo_" + id, data); return true; } catch (e) { return false; } };
 const snapshot = () => ({ housing: st.housing, target: st.target, area: st.area, shape: st.shape, custom: st.custom, sizes: st.sizes, view: st.view,
   door: st.door, locked: [...st.locked], rental: st.rental, budget: st.budget });
 function restore(rec) {
@@ -379,8 +396,10 @@ function renderMyQuotes() {
 }
 function saveAndOpen(candId) {
   const c = LAST.cs.find((x) => x.id === candId);
-  const rec = { id: E.buildQuote(c, {}).id, created: Date.now(), title: `${H().label} ${E.TARGETS[st.target].label} · ${c.id}.${c.title}`, candId, st: JSON.parse(JSON.stringify(snapshot())), views: 0, checked: [], clicks: {} };
-  const all = loadQ(); all.unshift(rec); saveQ(all); track("quote-saved"); openQuote(rec.id);
+  const rec = { id: E.buildQuote(c, {}).id, created: Date.now(), title: `${H().label} ${E.TARGETS[st.target].label} · ${c.id}.${c.title}`, candId, st: JSON.parse(JSON.stringify(snapshot())), views: 0, checked: [], clicks: {}, pins: {} };
+  const all = loadQ(); all.unshift(rec); saveQ(all);
+  if (st.photo && !savePhoto(rec.id, st.photo)) alert("사진 저장 공간이 부족해 사진 없이 저장했어요. 견적서 안에서 사진을 다시 추가할 수 있어요.");
+  track("quote-saved"); openQuote(rec.id);
 }
 function openQuote(id) {
   const all = loadQ(), rec = all.find((q) => q.id === id); if (!rec) return;
@@ -391,6 +410,17 @@ const PREFK = "diy_pref_merchant";
 const getPref = () => { try { return localStorage.getItem(PREFK) || "coupang"; } catch (e) { return "coupang"; } };
 const setPref = (v) => { try { localStorage.setItem(PREFK, v); } catch (e) {} };
 const curQuoteId = () => ($("#quote h2 + p").textContent.match(/Q[0-9A-Z]+/) || [""])[0];
+function photoPanel(rec, c, done) {
+  const photo = photoOf(rec.id), items = c.purchase.inBudget;
+  if (!photo) return `<p class="mut">내 방 사진을 추가하면, 사진 위에 놓을 자리를 표시하고 준비한 만큼 ✓로 바뀌어요. (사진은 이 기기에만 저장돼요)</p><input type="file" id="qPhoto" accept="image/*">`;
+  const pins = rec.pins || {};
+  const pinHtml = items.map((i, n) => pins[i.key] ? `<span class="pin${done.has(i.key) ? " done" : ""}" style="left:${pins[i.key].x}%;top:${pins[i.key].y}%" title="${esc(i.name)}">${done.has(i.key) ? "✓" : n + 1}</span>` : "").join("");
+  const sel = st.pinKey && items.some((i) => i.key === st.pinKey) ? st.pinKey : (items[0] || {}).key;
+  return `<div class="photobox" id="photoBox"><img src="${photo}" alt="내 방 사진">${pinHtml}</div>
+    ${items.length ? `<div class="row"><span class="mut">놓을 자리 표시</span><select id="pinItem">${items.map((i, n) => `<option value="${esc(i.key)}" ${i.key === sel ? "selected" : ""}>${n + 1}. ${esc(i.name)}</option>`).join("")}</select><button type="button" data-pinclear="1">표시 지우기</button></div>
+    <p class="mut">품목을 고르고 사진에서 놓을 자리를 누르면 번호가 표시돼요. "준비했어요"를 누르면 ✓로 바뀝니다.</p>` : ""}
+    <div class="afterbox">After(AI 생성) · 준비 중<br>사진 속 내 방에 반영된 모습은 AI 이미지 생성을 연결하면 이 자리에 나와요. 지금은 직접 표시한 위치와 진행 상황만 보여요.</div>`;
+}
 function renderQuote(rec) {
   const { r, opts, cs } = restore(rec), c = cs.find((x) => x.id === rec.candId), pref = getPref();
   const meta = { 집: `${E.HOUSING.find((h) => h.id === rec.st.housing).label}`, 방: E.TARGETS[rec.st.target].label, 크기: `${r.W}×${r.D}cm`,
@@ -412,12 +442,15 @@ function renderQuote(rec) {
     <p class="mut">견적서 번호 ${esc(rec.id)} · 작성일 ${new Date(rec.created).toLocaleDateString("ko-KR")} · ${rec.views}번째 열람 · 앱에 보관돼 언제든 다시 열 수 있어요</p>
     ${buyNow}
     <div class="row seg" id="prefM"><span class="mut">자주 쓰는 판매처</span>${E.MERCHANTS.map((m) => `<button type="button" data-pm="${m.id}" aria-pressed="${m.id === pref}">${esc(m.label)}</button>`).join("")}</div>
-    <div class="row seg" id="qBudget"><span class="mut">예산 바꿔보기</span>${[5, 15, 30, 50, 100].map((b) => `<button type="button" data-qb="${b * 10000}" aria-pressed="${rec.st.budget === b * 10000}">${b}만원</button>`).join("")}</div>
+    <div class="row seg" id="qBudget"><span class="mut">예산 바꿔보기</span>${[5, 15, 30, 50, 100].map((b) => `<button type="button" data-qb="${b * 10000}" aria-pressed="${rec.st.budget === b * 10000}">${b}만원</button>`).join("")}
+      <input id="qCustom" type="number" min="1" max="100000" step="1" placeholder="직접(만원)" style="width:104px"><button type="button" data-qbc="1">적용</button></div>
+    ${rec.st.budget > c.purchase.max * 1.3 ? `<p class="mut">예산이 넉넉해요. 이 안의 최대 구성은 약 ${won(c.purchase.max)}이에요. 남는 예산은 큰 가구 교체(소파·침대 등)에 쓸 수 있어요(준비 중).</p>` : ""}
     <div class="sug-wrap"><h3>이번에 드리는 제안</h3>${sg.map((x) => `<div class="sug"><b>${esc(x.title)}</b>${esc(x.body)}</div>`).join("")}
       <p class="mut">열 때마다 다른 제안이 나와요. 지금은 견적서 내용으로 만든 제안이고, 판매처 가격 정보를 연결하면 가격 변동 제안도 추가할 수 있어요.</p></div>
     <h3>진행 상황 <span class="mut">${done.size}/${total}개 준비</span></h3><div class="bar"><i style="width:${total ? Math.round(done.size / total * 100) : 0}%"></i></div>
     <table>${Object.entries(meta).map(([k, v]) => `<tr><th>${esc(k)}</th><td colspan="2">${esc(v)}</td></tr>`).join("")}<tr><th>추천 안</th><td colspan="2">${esc(q.plan)} (${esc(q.cost)})</td></tr></table>
-    ${E.svg(r, c, { locked: rec.st.locked })}
+    <h3>내 방 사진에서 보는 진행 상황</h3>${photoPanel(rec, c, done)}
+    <details><summary>참고 배치도(도면 보기)</summary>${E.svg(r, c, { locked: rec.st.locked })}</details>
     <h3>이렇게 바꿔요</h3><ol>${q.changes.map((x) => `<li>${esc(x)}</li>`).join("")}</ol>
     ${q.phases.length ? q.phases.map((p) => `<h3>${esc(p.title)} <span class="mut">소계 약 ${won(p.subtotal)}</span></h3>
       <table><tr><th>품목</th><th>크기·예상가</th><th>구매하러 가기</th></tr>${p.items.map(row).join("")}</table>`).join("")
@@ -430,7 +463,11 @@ function renderQuote(rec) {
     <p class="mut">${q.notices.map(esc).join("<br>")}</p>
     <button class="cta ghost" id="closeQuote" type="button">견적서 닫기</button>`;
 }
-document.addEventListener("change", (e) => {
+document.addEventListener("change", async (e) => {
+  if (e.target.id === "pinItem") { st.pinKey = e.target.value; return; }
+  if (e.target.id === "qPhoto") { const f = e.target.files[0]; if (!f) return; const data = await compress(f); const id = curQuoteId();
+    if (data && !savePhoto(id, data)) alert("사진 저장 공간이 부족해요. 오래된 견적서를 정리한 뒤 다시 시도해주세요.");
+    const rec = loadQ().find((q) => q.id === id); if (rec) renderQuote(rec); return; }
   const ck = e.target.closest("[data-chk]"); if (!ck) return;
   const id = curQuoteId(), all = loadQ(), rec = all.find((q) => q.id === id); if (!rec) return;
   const k = ck.dataset.chk, i = rec.checked.indexOf(k);
@@ -445,6 +482,13 @@ document.addEventListener("click", (e) => {
   if (pm) { setPref(pm.dataset.pm); track("pref-merchant-" + pm.dataset.pm); const rec = loadQ().find((q) => q.id === curQuoteId()); if (rec) renderQuote(rec); return; }
   const qb = e.target.closest("[data-qb]");
   if (qb) { const all = loadQ(), rec = all.find((q) => q.id === curQuoteId()); if (rec) { rec.st.budget = Number(qb.dataset.qb); saveQ(all); track("quote-budget-changed"); renderQuote(rec); } return; }
+  const qbc = e.target.closest("[data-qbc]");
+  if (qbc) { const v = Math.round(Number($("#qCustom").value)); if (!(v >= 1)) { alert("예산을 만원 단위로 입력해주세요. 예: 150"); return; }
+    const all = loadQ(), rec = all.find((q) => q.id === curQuoteId()); if (rec) { rec.st.budget = v * 10000; saveQ(all); track("quote-budget-custom"); renderQuote(rec); } return; }
+  const pb = e.target.closest("#photoBox img");
+  if (pb) { const r0 = pb.getBoundingClientRect(), key = ($("#pinItem") || {}).value; if (key) { const all = loadQ(), rec = all.find((q) => q.id === curQuoteId());
+      if (rec) { rec.pins = rec.pins || {}; rec.pins[key] = { x: Math.round((e.clientX - r0.left) / r0.width * 1000) / 10, y: Math.round((e.clientY - r0.top) / r0.height * 1000) / 10 }; st.pinKey = key; saveQ(all); track("pin-placed"); renderQuote(rec); } } return; }
+  if (e.target.closest("[data-pinclear]")) { const key = ($("#pinItem") || {}).value, all = loadQ(), rec = all.find((q) => q.id === curQuoteId()); if (rec && key && rec.pins) { delete rec.pins[key]; saveQ(all); renderQuote(rec); } return; }
   const un = e.target.closest("[data-unlock]");
   if (un) { un.dataset.unlock.split(",").filter(Boolean).forEach((id) => st.locked.delete(id)); const out = $("#out"); renderLock(); renderAdvSummary(); $("#go").click(); return; }
   const op = e.target.closest("[data-open]"); if (op) { openQuote(op.dataset.open); return; }
