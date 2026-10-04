@@ -51,6 +51,10 @@ textarea{width:100%;font:12px/1.5 ui-monospace,monospace;background:var(--bg);co
 .cta.ghost{background:transparent;color:var(--acc);border:2px solid var(--acc)}
 @media(prefers-color-scheme:dark){.cta{color:#0b2a1a}.cta.ghost{color:var(--acc)}}
 .tag{display:inline-block;font-size:12px;border:1px solid var(--line);border-radius:6px;padding:0 6px;margin-left:4px;color:var(--mut)}
+.adv{background:var(--card);border-radius:12px;padding:10px 12px;margin:12px 0}.adv>summary{cursor:pointer;font-size:15px;color:var(--fg)}
+.pri{outline:2px solid var(--acc)}
+.cta2{display:block;width:100%;text-align:center;background:var(--acc);color:#fff;border-radius:12px;padding:12px;margin:6px 0;text-decoration:none;font-weight:600;font-size:15px}
+@media(prefers-color-scheme:dark){.cta2{color:#0b2a1a}}
 .legend i{display:inline-block;width:12px;height:12px;border:1px solid var(--fg);vertical-align:middle;margin:0 4px 0 8px}
 #quote{margin-top:28px;border:2px solid var(--acc);border-radius:14px;padding:16px}
 #quote table{width:100%;border-collapse:collapse;font-size:14px}
@@ -58,35 +62,35 @@ textarea{width:100%;font:12px/1.5 ui-monospace,monospace;background:var(--bg);co
 #quote .qlinks{display:flex;gap:4px;flex-wrap:wrap}
 #quote .qlinks a{padding:2px 8px;font-size:12px}
 #quote svg{width:100%;max-width:360px;height:auto;display:block;margin:8px auto;--card:var(--bg)}
-@media print{
-  .notice,main>*:not(#quote){display:none!important}
-  main{max-width:none;padding:0}
-  #quote{border:0;margin:0;padding:0}
-  .noprint{display:none!important}
-  :root{--bg:#fff;--fg:#000;--mut:#444;--line:#ccc;--acc:#1f5a3c;--card:#fff;--lock:#f6c9c3}
-  .qlinks a{color:#1f5a3c;background:none;border:1px solid #1f5a3c}
-}
+.sug{background:var(--card);border-radius:12px;padding:10px 12px;margin:8px 0}
+.sug b{display:block;font-size:15px}
+.bar{height:8px;background:var(--line);border-radius:6px;overflow:hidden;margin:6px 0}.bar i{display:block;height:100%;background:var(--acc)}
+.chkrow{display:flex;gap:8px;align-items:flex-start}
+.myq{display:flex;justify-content:space-between;align-items:center;gap:8px;background:var(--card);border-radius:10px;padding:8px 12px;margin:6px 0;font-size:14px}
+.myq button{font:inherit;color:#fff;background:var(--acc);border:0;border-radius:8px;padding:4px 12px;cursor:pointer}
+@media(prefers-color-scheme:dark){.myq button{color:#0b2a1a}}
 </style>
 </head>
 <body>
 <div class="notice">프로토타입입니다. 사진은 이 기기에서만 미리보기되며 서버로 전송되지 않습니다.</div>
 <main>
+  <div id="myQuotes"></div>
   <h1>셀프 인테리어 배치와 견적서</h1>
   <p class="mut">업체 없이 직접 할 수 있는 개선안과 견적서를 드려요. 숫자를 입력하지 않아도, 그림을 골라 우리 집과 비슷하게 맞출 수 있어요.</p>
 
-  <h2>1. 어떤 집인가요?</h2>
+  <h2 data-n="어떤 집인가요?">어떤 집인가요?</h2>
   <div class="cards" id="housing"></div>
 
   <div id="targetBox">
-    <h2>2. 어느 방을 꾸밀까요?</h2>
+    <h2 data-n="어느 방을 꾸밀까요?">어느 방을 꾸밀까요?</h2>
     <div class="cards" id="target"></div>
   </div>
 
-  <h2 id="areaTitle">3. 집 크기를 골라주세요</h2>
+  <h2 id="areaTitle" data-n="집 크기를 골라주세요">집 크기를 골라주세요</h2>
   <p class="mut" id="areaHelp"></p>
   <div class="cards" id="areas"></div>
 
-  <h2 id="shapeTitle">4. 방 모양은 어떤가요?</h2>
+  <h2 id="shapeTitle" data-n="방 모양은 어떤가요?">방 모양은 어떤가요?</h2>
   <div class="cards sm" id="shapes"></div>
   <details style="margin-top:8px"><summary>줄자로 방 크기를 직접 입력하기 (선택)</summary>
     <div class="row">가로 <input id="w" type="number" min="200" max="700" step="10"> cm
@@ -96,21 +100,22 @@ textarea{width:100%;font:12px/1.5 ui-monospace,monospace;background:var(--bg);co
   </details>
   <p class="mut" id="roomLine"></p>
 
-  <h2>5. 문을 열고 들어서서 보면?</h2>
-  <p class="mut">방 문 앞에 서서 사진을 찍는다고 생각하고, 우리 집과 비슷한 그림을 골라주세요. 아래쪽이 문(촬영 위치)이고 위쪽이 맞은편 벽입니다.</p>
-  <div id="view"></div>
+  <details id="adv" class="adv">
+    <summary id="advSummary">우리 집과 다르면 바꾸기 (선택)</summary>
+    <h3 style="margin-top:14px">문을 열고 들어서서 보면?</h3>
+    <p class="mut">방 문 앞에 서서 사진을 찍는다고 생각하고, 우리 집과 비슷한 그림을 골라주세요. 아래쪽이 문(촬영 위치)이고 위쪽이 맞은편 벽입니다. 잘 모르겠으면 그대로 두셔도 괜찮아요.</p>
+    <div id="view"></div>
+    <h3 style="margin-top:18px">우리 집 가구와 비슷한 것</h3>
+    <p class="mut" id="furnHelp"></p>
+    <div id="furn"></div>
+    <h3 style="margin-top:18px">옮기기 어려운 가구를 눌러주세요</h3>
+    <p class="mut">붙박이장, 무거운 가구, 콘센트 때문에 못 옮기는 가구를 누르면 색이 바뀌고(🔒) 그 가구는 옮기지 않는 안만 추천해요. 다시 누르면 해제됩니다.</p>
+    <div class="plan" id="lockPlan"></div>
+    <p class="mut legend"><i style="background:var(--lock)"></i>이동 불가 <i style="background:var(--card)"></i>이동 가능</p>
+  </details>
+  <label class="row"><input type="checkbox" id="rental"> 임대라서 못을 박을 수 없어요 (무타공 제품 위주로 추천해요)</label>
 
-  <h2>6. 우리 집 가구와 비슷한 것을 골라주세요</h2>
-  <p class="mut" id="furnHelp"></p>
-  <div id="furn"></div>
-
-  <h2>7. 옮기기 어려운 가구를 눌러주세요</h2>
-  <p class="mut">붙박이장, 무거운 가구, 콘센트 때문에 못 옮기는 가구를 누르면 색이 바뀌고(🔒) 그 가구는 옮기지 않는 안만 추천해요. 다시 누르면 해제됩니다.</p>
-  <div class="plan" id="lockPlan"></div>
-  <p class="mut legend"><i style="background:var(--lock)"></i>이동 불가 <i style="background:var(--card)"></i>이동 가능</p>
-  <label class="row"><input type="checkbox" id="rental"> 임대라서 못을 박을 수 없어요</label>
-
-  <h2>8. 방 사진과 예산</h2>
+  <h2 data-n="방 사진과 예산">방 사진과 예산</h2>
   <div class="photo">
     <input type="file" id="photo" accept="image/*" capture="environment">
     <img id="preview" alt="" hidden>
@@ -125,6 +130,12 @@ textarea{width:100%;font:12px/1.5 ui-monospace,monospace;background:var(--bg);co
 </main>
 <script src="layout.js"></script>
 <script>
+// 방문·이용 측정(기본 꺼짐). 쿠키 없이 세는 서비스(예: GoatCounter)의 주소를 넣으면 켜집니다.
+// 예) const ANALYTICS_URL = "https://내코드.goatcounter.com/count";  (상업적 이용은 유료 플랜 확인 필요)
+const ANALYTICS_URL = "";
+if (ANALYTICS_URL) { const sc = document.createElement("script"); sc.async = true; sc.dataset.goatcounter = ANALYTICS_URL; sc.src = "//gc.zgo.at/count.js"; document.head.appendChild(sc); }
+const track = (name) => { try { window.goatcounter && window.goatcounter.count && window.goatcounter.count({ path: "event/" + name, title: name, event: true }); } catch (e) {} };
+
 const E = window.LayoutEngine;
 const $ = (s) => document.querySelector(s);
 const esc = (s) => String(s).replace(/[&<>"]/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;" }[c]));
@@ -132,8 +143,13 @@ const won = (n) => n.toLocaleString("ko-KR") + "원";
 const BUDGETS = [5, 15, 30, 50, 100];
 
 const st = { housing: "apt", target: "living", area: "apt59", shape: "std", sizes: E.suggestSizes(E.roomFor("apt", "apt59", "living"), "living"), touched: false,
-  view: Object.assign({}, E.DEFAULT_VIEW, { windows: ["far"] }), door: "sliding",
+  view: JSON.parse(JSON.stringify(E.DEFAULT_VIEW)), door: "sliding",
   locked: new Set(), rental: false, budget: 150000, customBudget: false, custom: null };
+function renumber() { let n = 1; document.querySelectorAll("main h2[data-n]").forEach((h) => { if (h.closest("[hidden]")) return; h.textContent = `${n++}. ${h.dataset.n}`; }); }
+function renderAdvSummary() {
+  const v = st.view, O = E.SIZE_OPTIONS, parts = [`창 ${v.windows.length ? v.windows.map((w) => E.WALLS[w]).join("·") : "없음"}`, `큰 가구 ${E.BIG_WALLS[v.bigWall]}`, `문 ${E.DOOR_POS[v.door]}`];
+  $("#advSummary").innerHTML = `우리 집과 다르면 바꾸기 (선택)<br><span class="mut">지금 가정: ${esc(parts.join(" · "))}${st.locked.size ? ` · 이동 불가 ${st.locked.size}개` : ""}</span>`;
+}
 const H = () => E.HOUSING.find((x) => x.id === st.housing);
 const room = () => st.custom || E.roomFor(st.housing, st.area, st.target, st.shape);
 const living = () => st.target === "living";
@@ -152,6 +168,11 @@ const bigWallSvg = (w) => {
   const blk = { left: `<rect x="24" y="22" width="16" height="34" fill="var(--lock)" stroke="var(--fg)"/>`, right: `<rect x="70" y="22" width="16" height="34" fill="var(--lock)" stroke="var(--fg)"/>`,
     far: `<rect x="38" y="8" width="34" height="14" fill="var(--lock)" stroke="var(--fg)"/>`, near: `<rect x="38" y="54" width="34" height="14" fill="var(--lock)" stroke="var(--fg)"/>` }[w];
   return MINI(blk + camera);
+};
+const winSizeSvg = (w) => { const k = 66 / 300, ww = Math.min(60, w * k * 3 / 2 + 10); return MINI(`<rect x="${55 - ww / 2}" y="3" width="${ww}" height="6" fill="var(--acc)"/>` + camera); };
+const obsSvg = (size, corner) => {
+  const sz = size === "none" ? 0 : size === "pillar" ? 9 : 22, x = corner === "fr" || corner === "nr" ? 88 - sz : 22, y = corner === "nl" || corner === "nr" ? 72 - sz : 6;
+  return MINI((sz ? `<rect x="${x}" y="${y}" width="${sz}" height="${sz}" fill="var(--line)" stroke="var(--fg)" stroke-dasharray="2 2"/>` : "") + camera);
 };
 const doorSvgPos = (pos) => { const x = pos === "left" ? 24 : pos === "center" ? 44 : 64; return MINI(`<rect x="${x}" y="69" width="22" height="6" fill="var(--bg)" stroke="var(--acc)" stroke-width="2"/>` + camera); };
 function areaSvg(a, h, maxSqm) {
@@ -191,7 +212,7 @@ function renderTarget() {
 }
 function renderAreas() {
   const h = H(), max = Math.max(...h.areas.map((a) => a.sqm)), n = h.targets.length < 2 ? 2 : 3;
-  $("#areaTitle").textContent = `${n}. ${h.id === "apt" ? "아파트 평형을 골라주세요" : "집 크기(전용면적)를 골라주세요"}`;
+  $("#areaTitle").dataset.n = h.id === "apt" ? "아파트 평형을 골라주세요" : "집 크기(전용면적)를 골라주세요";
   $("#areaHelp").textContent = h.id === "apt"
     ? "평형은 분양 때 부르는 공급평수예요(전용면적은 보통 그보다 작습니다). 24평형·32평형처럼 부르는 크기는 같은 카드에 있어요. 그림은 집 전체와 꾸밀 방(색칠)의 대략적인 비율이에요."
     : "그림은 집 전체(바깥 사각형)와 꾸밀 방(색칠)의 대략적인 비율이에요. 방 크기는 추정치입니다.";
@@ -199,7 +220,7 @@ function renderAreas() {
     const r = E.roomFor(h.id, a.id, st.target, "std");
     return card("area", a.id, areaSvg(a, h, max), a.label, `전용 약 ${a.sqm}㎡ (${a.pyeong}평)<br>${esc(a.desc)}<br>${E.TARGETS[st.target].label} 약 ${(r.W / 100).toFixed(1)}×${(r.D / 100).toFixed(1)}m`, a.id === st.area && !st.custom);
   }).join("");
-  $("#shapeTitle").textContent = `${n + 1}. 방 모양은 어떤가요?`;
+  $("#shapeTitle").dataset.n = "방 모양은 어떤가요?";
   $("#shapes").innerHTML = E.SHAPES.map((s) => card("shape", s.id, shapeSvg(s.id), s.label, esc(s.desc), s.id === st.shape && !st.custom)).join("");
   const r = room();
   $("#roomLine").textContent = `선택한 ${E.TARGETS[st.target].label} 크기(추정): 가로 ${r.W}cm × 세로 ${r.D}cm${st.custom ? " (직접 입력)" : ""}`;
@@ -209,6 +230,11 @@ function renderView() {
   let h = `<h3>창이 어디에 있나요? (여러 곳 선택 가능, 창이 없으면 모두 해제)</h3><div class="cards sm">${Object.entries(E.WALLS).map(([w, label]) => card("win", w, windowSvg(w, true), label, "", on(w))).join("")}</div>`;
   h += `<h3>큰 가구(${living() ? "소파" : "침대"})는 어느 벽에 놓여 있나요?</h3><div class="cards two">${Object.entries(E.BIG_WALLS).map(([w, label]) => card("big", w, bigWallSvg(w), label, "", st.view.bigWall === w)).join("")}</div>`;
   h += `<h3>방 문은 입구 벽의 어디에 있나요?</h3><div class="cards sm">${Object.entries(E.DOOR_POS).map(([p, label]) => card("door", p, doorSvgPos(p), label, "", st.view.door === p)).join("")}</div>`;
+  if (st.view.windows.length)
+    h += `<h3>창 크기</h3><div class="cards sm">${Object.entries(E.WIN_SIZES).map(([k, v]) => card("winsize", k, winSizeSvg(v.w), v.label, "", st.view.winSize === k)).join("")}</div>`;
+  h += `<h3>방에 튀어나온 곳(기둥·ㄱ자 모서리)이 있나요?</h3><div class="cards sm">${Object.entries(E.OBSTACLES).map(([k, v]) => card("obs", k, obsSvg(k, "fl"), v.label, v.s ? `약 ${v.s}cm` : "", st.view.obstacle.size === k)).join("")}</div>`;
+  if (st.view.obstacle.size !== "none")
+    h += `<h3>어느 모서리인가요?</h3><div class="cards two">${Object.entries(E.CORNERS).map(([k, label]) => card("corner", k, obsSvg(st.view.obstacle.size, k), label, "", st.view.obstacle.corner === k)).join("")}</div>`;
   if (living() && st.view.windows.length)
     h += `<h3>발코니·창문이 열리는 방식</h3><div class="cards two">${card("open", "sliding", doorOpenSvg(false), "미닫이", "옆으로 밀어서", st.door === "sliding")}${card("open", "swing", doorOpenSvg(true), "여닫이", "앞으로 열려서", st.door === "swing")}</div>`;
   $("#view").innerHTML = h;
@@ -239,7 +265,8 @@ function renderBudget() {
   $("#customBox").hidden = !st.customBudget;
 }
 function renderAll() {
-  renderHousing(); renderTarget(); renderAreas(); renderView(); renderFurn(); renderLock(); renderBudget(); $("#out").innerHTML = ""; $("#quote").hidden = true;
+  renderAdvSummary();
+  renderHousing(); renderTarget(); renderAreas(); renderView(); renderFurn(); renderLock(); renderBudget(); renumber(); $("#out").innerHTML = ""; $("#quote").hidden = true;
 }
 
 /* ---------- 이벤트 ---------- */
@@ -255,6 +282,9 @@ document.addEventListener("click", (e) => {
     else if (g === "win") { const i = st.view.windows.indexOf(v); i >= 0 ? st.view.windows.splice(i, 1) : st.view.windows.push(v); }
     else if (g === "big") st.view.bigWall = v;
     else if (g === "door") st.view.door = v;
+    else if (g === "winsize") st.view.winSize = v;
+    else if (g === "obs") st.view.obstacle.size = v;
+    else if (g === "corner") st.view.obstacle.corner = v;
     else if (g === "open") st.door = v;
     else { touchSize = true;
       if (g === "sofa") st.sizes.sofa = O.sofa.find((o) => o.id === v).v;
@@ -271,10 +301,6 @@ document.addEventListener("click", (e) => {
   const b = e.target.closest("#budget button");
   if (b) { if (b.dataset.b === "custom") { st.customBudget = true; st.budget = Math.round(Number($("#customBudget").value) * 10000) || 0; }
     else { st.customBudget = false; st.budget = Number(b.dataset.b); } renderBudget(); return; }
-  const qb = e.target.closest("[data-quote]");
-  if (qb) { showQuote(qb.dataset.quote); return; }
-  if (e.target.closest("#printQuote")) window.print();
-  if (e.target.closest("#closeQuote")) { $("#quote").hidden = true; $("#out").scrollIntoView({ behavior: "smooth" }); }
 });
 $("#customBudget").addEventListener("input", (e) => { st.budget = Math.round(Number(e.target.value) * 10000) || 0; });
 ["#w", "#d"].forEach((s) => $(s).addEventListener("input", () => {
@@ -290,8 +316,8 @@ $("#photo").addEventListener("change", (e) => {
 /* ---------- 결과와 견적서 ---------- */
 let LAST = null;
 function itemHtml(it, over) {
-  return `<div class="item${over ? " over" : ""}"><b>${esc(it.name)}</b> <span class="tag">${esc(it.diff)} · 약 ${it.min}분</span>
-    <div class="meta">${esc(it.size)} · 준비물: ${esc(it.tools)}</div>
+  return `<div class="item${over ? " over" : ""}"><b>${esc(it.name)}</b> <span class="tag">${esc(it.diff)} · 약 ${it.min}분</span>${it.tag ? ` <span class="tag" style="color:var(--acc)">${esc(it.tag)}</span>` : ""}
+    <div class="meta">${esc(it.size)} · 준비물: ${esc(it.tools)}</div>${it.fit ? `<div class="meta" style="color:var(--acc)">✓ ${esc(it.fit)}</div>` : ""}
     <div class="meta">예상가 ${won(it.price[0])}~${won(it.price[1])} (임시 가정)${over ? " · 예산 초과로 제외" : ""}</div>
     <details><summary>직접 하는 방법</summary><ol>${it.steps.map((s) => `<li>${esc(s)}</li>`).join("")}</ol></details>
     ${over ? "" : `<div class="links">${it.links.map((l) => `<a href="${esc(l.url)}" target="_blank" rel="noopener">${esc(l.label)}에서 보기</a>`).join("")}</div>`}</div>`;
@@ -315,6 +341,7 @@ $("#go").addEventListener("click", () => {
   $("#out").innerHTML = `<h2>추천 (${esc(H().label)} ${esc(E.TARGETS[st.target].label)} · ${r.W}×${r.D}cm · 예산 ${won(st.budget)})</h2>
     <p class="mut">현재 배치는 일반적인 구성으로 가정했어요. 실제와 다르면 위에서 가구 크기와 구조를 바꿔보세요.</p>${lockNote}` +
     (E.anyApplicable(cs) ? "" : `<p class="mut"><b>이동 불가로 지정한 가구 때문에 적용할 수 있는 안이 없어요.</b> 일부를 해제해보세요.</p>`) +
+    (cs.some((c) => !c.blocked && c.purchase.total === 0 && c.score === best) && cs.some((c) => !c.blocked && c.items.length) ? `<p class="mut">💡 돈이 안 드는 재배치(B)부터 해보고, 분위기를 더 바꾸고 싶으면 A·C의 소품을 더하는 순서가 좋아요.</p>` : "") +
     cs.map((c) => {
       const p = c.purchase;
       const buy = c.items.length
@@ -322,43 +349,110 @@ $("#go").addEventListener("click", () => {
             ${p.inBudget.map((i) => itemHtml(i, false)).join("")}${p.over.map((i) => itemHtml(i, true)).join("")}
             ${c.rentalNote ? `<p class="mut">${esc(c.rentalNote)}</p>` : ""}</div>`
         : `<div class="buy"><b>구매 없이 가능</b><p class="mut">기존 가구만 옮기는 안입니다. 이동 순서: ${c.changes.map(esc).join(" → ")}</p></div>`;
-      return `<div class="cand${c.blocked ? " blocked" : ""}"><h3>${c.id}. ${esc(c.title)} ${c.score === best && !c.blocked ? "· 추천" : ""}<span class="score">${c.blocked ? "적용 불가" : c.score + "점"}</span></h3>
+      return `<div class="cand${c.blocked ? " blocked" : ""}"><h3>${c.id}. ${esc(c.title)} ${c.score === best && !c.blocked ? "· 가장 무난" : ""}<span class="score">${c.blocked ? "적용 불가" : c.score + "점"}</span></h3>
         <div class="mut">${esc(c.cost)}</div>
         ${E.svg(r, c, { locked: [...st.locked] })}
         <ul class="chk">${c.checks.map((k) => `<li class="${k.level}">${esc(k.msg)}</li>`).join("")}</ul>
-        ${c.blocked ? "" : buy}
-        ${c.blocked ? "" : `<button class="cta ghost" type="button" data-quote="${c.id}">견적서 보기 · PDF로 저장</button>`}
+        ${c.blocked ? `<button class="cta ghost" type="button" data-unlock="${esc((c.blockedBy || []).join(","))}">${esc((c.blockedBy || []).map((id) => names[id] || id).join(", "))} 이동 불가를 해제하고 다시 보기</button>` : buy}
+        ${c.blocked ? "" : `<button class="cta ghost" type="button" data-save="${c.id}">견적서 받기 (앱에 보관)</button>`}
         <details><summary>AI 이미지에 넣을 지시문</summary><textarea readonly rows="6">${esc(c.prompt)}</textarea></details></div>`;
     }).join("");
   $("#quote").hidden = true;
   $("#out").scrollIntoView({ behavior: "smooth" });
 });
 
-function showQuote(id) {
-  const c = LAST.cs.find((x) => x.id === id), meta = metaText();
-  const q = E.buildQuote(c, meta);
-  const today = new Date().toLocaleDateString("ko-KR");
-  const rows = (items) => items.map((i) => `<tr><td><b>${esc(i.name)}</b><br><span class="mut">${esc(i.size)} · ${esc(i.diff)} · 약 ${i.min}분</span></td>
-      <td>${won(i.price[0])}~<br>${won(i.price[1])}</td><td><div class="qlinks">${i.links.map((l) => `<a href="${esc(l.url)}" target="_blank" rel="noopener">${esc(l.label)}</a>`).join("")}</div></td></tr>`).join("");
-  $("#quote").hidden = false;
-  $("#quote").innerHTML = `<h2 style="margin-top:0">셀프 인테리어 견적서</h2>
-    <p class="mut">견적서 번호 ${q.id} · 작성일 ${today} · 가격은 임시 가정(작성일 기준)</p>
-    <table>${Object.entries(meta).map(([k, v]) => `<tr><th>${esc(k)}</th><td>${esc(v)}</td></tr>`).join("")}<tr><th>추천 안</th><td>${esc(q.plan)} (${esc(q.cost)})</td></tr></table>
-    ${E.svg(LAST.r, c, { locked: [...st.locked] })}
-    <h3>이렇게 바꿔요</h3><ol>${q.changes.map((x) => `<li>${esc(x)}</li>`).join("")}</ol>
-    ${q.phases.length ? q.phases.map((p) => `<h3>${esc(p.title)} <span class="mut">소계 약 ${won(p.subtotal)}</span></h3>
-      <table><tr><th>품목·크기</th><th>예상가(임시)</th><th>판매처</th></tr>${rows(p.items)}</table>`).join("")
-      : `<h3>구매 없이 가능한 안이에요</h3><p>위 순서대로 가구만 옮겨보세요.</p>`}
-    <p><b>합계 약 ${won(q.total)}</b> <span class="mut">(예산 ${won(st.budget)} 안)</span></p>
-    ${q.excluded.length ? `<p class="mut">예산 초과로 제외: ${q.excluded.map((i) => esc(i.name)).join(", ")}</p>` : ""}
-    <h3>점검 결과</h3><ul class="chk">${q.checks.map((k) => `<li class="${k.level}">${esc(k.msg)}</li>`).join("")}</ul>
-    <p class="mut">${q.notices.map(esc).join("<br>")}</p>
-    <div class="noprint"><button class="cta" id="printQuote" type="button">PDF로 저장 (인쇄 창에서 "PDF로 저장" 선택)</button>
-    <button class="cta ghost" id="closeQuote" type="button">견적서 닫기</button>
-    <p class="mut">PDF에도 판매처 링크가 그대로 들어가고, 눌러서 바로 구매할 수 있어요.</p></div>`;
+/* ---------- 앱에 보관되는 견적서 (PDF 없음) ---------- */
+const QKEY = "diy_quotes_v1";
+const loadQ = () => { try { return JSON.parse(localStorage.getItem(QKEY)) || []; } catch (e) { return []; } };
+const saveQ = (a) => { try { localStorage.setItem(QKEY, JSON.stringify(a)); } catch (e) {} };
+const snapshot = () => ({ housing: st.housing, target: st.target, area: st.area, shape: st.shape, custom: st.custom, sizes: st.sizes, view: st.view,
+  door: st.door, locked: [...st.locked], rental: st.rental, budget: st.budget });
+function restore(rec) {
+  const s = rec.st, r = s.custom || E.roomFor(s.housing, s.area, s.target, s.shape);
+  const opts = { housing: s.housing, target: s.target, sizes: s.sizes, view: s.view, door: s.door, locked: s.locked, budget: s.budget, rental: s.rental };
+  return { r, opts, cs: E.candidates(r, opts) };
+}
+function renderMyQuotes() {
+  const all = loadQ();
+  $("#myQuotes").innerHTML = all.length ? `<h2>내 견적서 (앱에 보관돼요)</h2>` + all.map((q) =>
+    `<div class="myq"><span>${esc(q.id)} · ${esc(q.title)} · ${q.views}번 열람</span><button type="button" data-open="${esc(q.id)}">열기</button></div>`).join("") : "";
+}
+function saveAndOpen(candId) {
+  const c = LAST.cs.find((x) => x.id === candId);
+  const rec = { id: E.buildQuote(c, {}).id, created: Date.now(), title: `${H().label} ${E.TARGETS[st.target].label} · ${c.id}.${c.title}`, candId, st: JSON.parse(JSON.stringify(snapshot())), views: 0, checked: [], clicks: {} };
+  const all = loadQ(); all.unshift(rec); saveQ(all); track("quote-saved"); openQuote(rec.id);
+}
+function openQuote(id) {
+  const all = loadQ(), rec = all.find((q) => q.id === id); if (!rec) return;
+  rec.views += 1; saveQ(all); track("quote-opened"); renderQuote(rec); renderMyQuotes();
   $("#quote").scrollIntoView({ behavior: "smooth" });
 }
+const PREFK = "diy_pref_merchant";
+const getPref = () => { try { return localStorage.getItem(PREFK) || "coupang"; } catch (e) { return "coupang"; } };
+const setPref = (v) => { try { localStorage.setItem(PREFK, v); } catch (e) {} };
+const curQuoteId = () => ($("#quote h2 + p").textContent.match(/Q[0-9A-Z]+/) || [""])[0];
+function renderQuote(rec) {
+  const { r, opts, cs } = restore(rec), c = cs.find((x) => x.id === rec.candId), pref = getPref();
+  const meta = { 집: `${E.HOUSING.find((h) => h.id === rec.st.housing).label}`, 방: E.TARGETS[rec.st.target].label, 크기: `${r.W}×${r.D}cm`,
+    구조: `창 ${rec.st.view.windows.length ? rec.st.view.windows.map((w) => E.WALLS[w]).join("·") : "없음"} / 큰 가구 ${E.BIG_WALLS[rec.st.view.bigWall]} / 문 ${E.DOOR_POS[rec.st.view.door]}` };
+  const q = E.buildQuote(c, meta), done = new Set(rec.checked), total = c.purchase.inBudget.length;
+  const daysOld = Math.floor((Date.now() - rec.created) / 86400000);
+  const sg = E.suggestions(cs, rec.candId, rec.checked, rec.st.budget, rec.views - 1, { daysOld, month: new Date().getMonth() + 1 });
+  const ordered = (links) => [...links].sort((a, b) => (b.id === pref) - (a.id === pref));
+  const linkHtml = (i) => ordered(i.links).map((l, k) => `<a ${k === 0 ? 'class="pri"' : ""} href="${esc(l.url)}" target="_blank" rel="noopener" data-click="${esc(i.key)}" data-m="${esc(l.id)}">${esc(l.label)}</a>`).join("");
+  const row = (i) => `<tr><td class="chkrow"><label><input type="checkbox" data-chk="${esc(i.key)}" ${done.has(i.key) ? "checked" : ""}> <b>${esc(i.name)}</b></label>${i.tag ? ` <span class="tag" style="color:var(--acc)">${esc(i.tag)}</span>` : ""}</td>
+      <td><span class="mut">${esc(i.size)} · ${esc(i.diff)} · 약 ${i.min}분<br>${won(i.price[0])}~${won(i.price[1])} (임시)</span><br><span class="mut" style="color:var(--acc)">✓ ${esc(i.fit || "")}</span></td>
+      <td><div class="qlinks">${linkHtml(i)}</div></td></tr>`;
+  const ph1 = q.phases[0], prefLabel = E.MERCHANTS.find((m) => m.id === pref).label;
+  const buyNow = ph1 ? `<div class="sug"><b>지금 사러 가기 · 1단계 <span class="mut">약 ${won(ph1.subtotal)}</span></b>
+      ${ph1.items.map((i) => { const l = i.links.find((x) => x.id === pref) || i.links[0]; return `<a class="cta2" href="${esc(l.url)}" target="_blank" rel="noopener" data-click="${esc(i.key)}" data-m="${esc(l.id)}">${esc(i.name)} · ${esc(l.label)}에서 보기</a>`; }).join("")}
+      <p class="mut">사고 나면 돌아와 아래에서 "준비했어요"를 눌러주세요.</p></div>` : "";
+  $("#quote").hidden = false;
+  $("#quote").innerHTML = `<h2 style="margin-top:0">셀프 인테리어 견적서</h2>
+    <p class="mut">견적서 번호 ${esc(rec.id)} · 작성일 ${new Date(rec.created).toLocaleDateString("ko-KR")} · ${rec.views}번째 열람 · 앱에 보관돼 언제든 다시 열 수 있어요</p>
+    ${buyNow}
+    <div class="row seg" id="prefM"><span class="mut">자주 쓰는 판매처</span>${E.MERCHANTS.map((m) => `<button type="button" data-pm="${m.id}" aria-pressed="${m.id === pref}">${esc(m.label)}</button>`).join("")}</div>
+    <div class="row seg" id="qBudget"><span class="mut">예산 바꿔보기</span>${[5, 15, 30, 50, 100].map((b) => `<button type="button" data-qb="${b * 10000}" aria-pressed="${rec.st.budget === b * 10000}">${b}만원</button>`).join("")}</div>
+    <div class="sug-wrap"><h3>이번에 드리는 제안</h3>${sg.map((x) => `<div class="sug"><b>${esc(x.title)}</b>${esc(x.body)}</div>`).join("")}
+      <p class="mut">열 때마다 다른 제안이 나와요. 지금은 견적서 내용으로 만든 제안이고, 판매처 가격 정보를 연결하면 가격 변동 제안도 추가할 수 있어요.</p></div>
+    <h3>진행 상황 <span class="mut">${done.size}/${total}개 준비</span></h3><div class="bar"><i style="width:${total ? Math.round(done.size / total * 100) : 0}%"></i></div>
+    <table>${Object.entries(meta).map(([k, v]) => `<tr><th>${esc(k)}</th><td colspan="2">${esc(v)}</td></tr>`).join("")}<tr><th>추천 안</th><td colspan="2">${esc(q.plan)} (${esc(q.cost)})</td></tr></table>
+    ${E.svg(r, c, { locked: rec.st.locked })}
+    <h3>이렇게 바꿔요</h3><ol>${q.changes.map((x) => `<li>${esc(x)}</li>`).join("")}</ol>
+    ${q.phases.length ? q.phases.map((p) => `<h3>${esc(p.title)} <span class="mut">소계 약 ${won(p.subtotal)}</span></h3>
+      <table><tr><th>품목</th><th>크기·예상가</th><th>구매하러 가기</th></tr>${p.items.map(row).join("")}</table>`).join("")
+      : `<h3>구매 없이 가능한 안이에요</h3><p>위 순서대로 가구만 옮겨보세요.</p>`}
+    <p><b>합계 약 ${won(q.total)}</b> <span class="mut">(예산 ${won(rec.st.budget)} 안)</span></p>
+    ${q.excluded.length ? `<p class="mut">예산 초과로 제외: ${q.excluded.map((i) => esc(i.name)).join(", ")}</p>` : ""}
+    <h3>사기 전에 확인할 4가지</h3><ul class="chk">${q.precheck.map((x) => `<li>${esc(x)}</li>`).join("")}</ul>
+    <p class="mut">온라인 가구 분쟁은 배송 지연·반품비·파손·오배송·배송비 미고지에서 많이 생겨요(한국소비자원 5년 1,052건 중 배송 지연 26.4%, 반품비 22.2%, 파손 20.1%).</p>
+    <h3>점검 결과</h3><ul class="chk">${q.checks.map((k) => `<li class="${k.level}">${esc(k.msg)}</li>`).join("")}</ul>
+    <p class="mut">${q.notices.map(esc).join("<br>")}</p>
+    <button class="cta ghost" id="closeQuote" type="button">견적서 닫기</button>`;
+}
+document.addEventListener("change", (e) => {
+  const ck = e.target.closest("[data-chk]"); if (!ck) return;
+  const id = curQuoteId(), all = loadQ(), rec = all.find((q) => q.id === id); if (!rec) return;
+  const k = ck.dataset.chk, i = rec.checked.indexOf(k);
+  if (ck.checked && i < 0) rec.checked.push(k); if (!ck.checked && i >= 0) rec.checked.splice(i, 1);
+  saveQ(all); track("item-checked"); renderQuote(rec);
+});
+document.addEventListener("click", (e) => {
+  const lk = e.target.closest("a[data-click]");
+  if (lk) { const id = curQuoteId(), all = loadQ(), rec = all.find((q) => q.id === id);
+    if (rec) { const k = lk.dataset.click; rec.clicks[k] = (rec.clicks[k] || 0) + 1; saveQ(all); } track("merchant-" + lk.dataset.m); return; }
+  const pm = e.target.closest("[data-pm]");
+  if (pm) { setPref(pm.dataset.pm); track("pref-merchant-" + pm.dataset.pm); const rec = loadQ().find((q) => q.id === curQuoteId()); if (rec) renderQuote(rec); return; }
+  const qb = e.target.closest("[data-qb]");
+  if (qb) { const all = loadQ(), rec = all.find((q) => q.id === curQuoteId()); if (rec) { rec.st.budget = Number(qb.dataset.qb); saveQ(all); track("quote-budget-changed"); renderQuote(rec); } return; }
+  const un = e.target.closest("[data-unlock]");
+  if (un) { un.dataset.unlock.split(",").filter(Boolean).forEach((id) => st.locked.delete(id)); const out = $("#out"); renderLock(); renderAdvSummary(); $("#go").click(); return; }
+  const op = e.target.closest("[data-open]"); if (op) { openQuote(op.dataset.open); return; }
+  const sv = e.target.closest("[data-save]"); if (sv) { saveAndOpen(sv.dataset.save); return; }
+  if (e.target.closest("#closeQuote")) { $("#quote").hidden = true; $("#out").scrollIntoView({ behavior: "smooth" }); }
+});
 
+renderMyQuotes();
 renderAll();
 </script>
 </body>

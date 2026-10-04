@@ -108,7 +108,10 @@
   const WALLS = { far: "맞은편 벽", left: "왼쪽 벽", right: "오른쪽 벽" };
   const BIG_WALLS = { left: "왼쪽 벽", right: "오른쪽 벽", far: "맞은편 벽", near: "입구가 있는 벽" };
   const DOOR_POS = { left: "입구 벽의 왼쪽", center: "입구 벽의 가운데", right: "입구 벽의 오른쪽" };
-  const DEFAULT_VIEW = { windows: ["far"], bigWall: "left", door: "right" };
+  const WIN_SIZES = { sm: { label: "작은 창", w: 90 }, md: { label: "보통 창", w: 150 }, lg: { label: "통창·큰 발코니창", w: 240 } };
+  const OBSTACLES = { none: { label: "없음", s: 0 }, pillar: { label: "기둥·작은 돌출", s: 45 }, notch: { label: "큰 돌출·ㄱ자 모서리", s: 120 } };
+  const CORNERS = { fl: "맞은편 왼쪽 모서리", fr: "맞은편 오른쪽 모서리", nl: "입구 쪽 왼쪽 모서리", nr: "입구 쪽 오른쪽 모서리" };
+  const DEFAULT_VIEW = { windows: ["far"], bigWall: "left", door: "right", winSize: "md", obstacle: { size: "none", corner: "fl" } };
 
   const FIXED_PROMPT =
     "방의 벽·창문·바닥·천장과 언급되지 않은 기존 가구는 원본 그대로 유지한다. " +
@@ -133,7 +136,7 @@
       steps: ["콘센트 위치를 확인한다", "받침을 조립하고 전구를 끼운다", "벽·가구와 10cm 이상 띄운다"] },
     chair: { name: "1인 의자", size: "폭 75cm 이하", price: [50000, 150000], diff: "쉬움", min: 20, tools: "드라이버(조립 시)", keyword: "1인 암체어 1인용 소파",
       steps: ["상자를 열고 다리를 조립한다", "창가에 놓고 문 열림 반경을 확인한다"] },
-    shelf: { name: "무타공 선반", size: "폭 60~80cm", price: [10000, 30000], diff: "쉬움", min: 15, tools: "없음", keyword: "무타공 선반",
+    shelf: { name: "무타공 선반", size: "폭 60~80cm", price: [10000, 30000], diff: "쉬움", min: 15, tools: "없음", tag: "무타공", keyword: "무타공 선반",
       steps: ["붙일 벽을 알코올로 닦는다", "수평을 맞춰 붙이고 24시간 두었다 올린다", "허용 하중을 확인한다"] },
     nightstand: { name: "협탁", size: "가로·세로 40cm 안팎", price: [20000, 60000], diff: "쉬움", min: 20, tools: "드라이버", keyword: "협탁 침대 사이드테이블",
       steps: ["조립해서 침대 옆에 놓는다", "충전선 위치를 확인한다"] },
@@ -143,7 +146,7 @@
       steps: ["부품을 확인하고 조립한다", "벽 전도 방지 고정구를 사용한다(임대는 무타공 제품)", "침대 발치에 둔다"] },
     desk: { name: "소형 책상", size: "폭 100cm, 깊이 50cm", price: [50000, 120000], diff: "보통", min: 40, tools: "드라이버", keyword: "소형 책상 100cm",
       steps: ["조립해서 창 밑에 놓는다", "의자 빼는 공간 90cm를 확인한다"] },
-    hanger: { name: "문걸이 수납", size: "문 두께 호환 확인", price: [10000, 30000], diff: "쉬움", min: 5, tools: "없음", keyword: "도어 행거 문걸이",
+    hanger: { name: "문걸이 수납", size: "문 두께 호환 확인", price: [10000, 30000], diff: "쉬움", min: 5, tools: "없음", tag: "무타공", keyword: "도어 행거 문걸이",
       steps: ["문 두께를 잰다", "걸어서 사용한다(못 불필요)"] },
     // 예산이 넉넉할 때 이어서 담는 추가 품목
     curtain: { name: "암막 커튼", size: "창 폭의 1.5~2배", price: [30000, 90000], diff: "쉬움", min: 20, tools: "없음(커튼봉이 있을 때)", keyword: "암막 커튼",
@@ -158,7 +161,7 @@
       steps: ["빛이 드는 곳을 정한다", "통로를 막지 않게 둔다"] },
     ottoman: { name: "수납 오토만", size: "폭 40~60cm", price: [30000, 80000], diff: "쉬움", min: 10, tools: "없음", keyword: "수납 오토만 스툴",
       steps: ["소파 앞이나 침대 발치에 둔다", "수납 용도로 정리한다"] },
-    frame: { name: "스탠드형 액자", size: "A3~A2", price: [10000, 50000], diff: "쉬움", min: 5, tools: "없음", keyword: "스탠드 액자 인테리어",
+    frame: { name: "스탠드형 액자", size: "A3~A2", price: [10000, 50000], diff: "쉬움", min: 5, tools: "없음", tag: "무타공", keyword: "스탠드 액자 인테리어",
       steps: ["선반·TV장 위에 세워 둔다(못 불필요)"] },
     bedding: { name: "침구 세트", size: "침대 크기에 맞춤", price: [40000, 120000], diff: "쉬움", min: 15, tools: "없음", keyword: "침구 세트 이불 커버",
       steps: ["침대 크기를 확인한다", "색을 방 분위기와 맞춘다"] },
@@ -211,6 +214,12 @@
     return { x: U.W - 80, y: U.D / 2 - 80, w: 80, h: 160 };
   }
 
+  // 받침 유무에 따라 조사를 붙인다 (이/가, 은/는, 와/과)
+  const hasJong = (w) => { const c = String(w).trim().slice(-1).charCodeAt(0); return c >= 0xac00 && c <= 0xd7a3 && (c - 0xac00) % 28 !== 0; };
+  const iga = (w) => w + (hasJong(w) ? "이" : "가");
+  const eunn = (w) => w + (hasJong(w) ? "은" : "는");
+  const wagwa = (w) => w + (hasJong(w) ? "과" : "와");
+
   const lvl = (v, errBelow, warnBelow, okMsg, errMsg, warnMsg) =>
     v < errBelow ? { level: "error", msg: errMsg } : v < warnBelow ? { level: "warn", msg: warnMsg } : { level: "ok", msg: okMsg };
 
@@ -219,13 +228,13 @@
     const solids = solidsOf(pieces);
     for (let i = 0; i < solids.length; i++)
       for (let j = i + 1; j < solids.length; j++)
-        if (overlap(solids[i], solids[j])) out.push({ level: "error", msg: `${solids[i].label}와(과) ${solids[j].label}이(가) 겹침` });
+        if (overlap(solids[i], solids[j])) out.push({ level: "error", msg: `${wagwa(solids[i].label)} ${iga(solids[j].label)} 겹침` });
     pieces.forEach((p) => {
-      if (p.x < 0 || p.y < 0 || p.x + p.w > Uc.W || p.y + p.h > Uc.D) out.push({ level: "error", msg: `${p.label}이(가) 방 밖으로 나감` });
+      if (p.x < 0 || p.y < 0 || p.x + p.w > Uc.W || p.y + p.h > Uc.D) out.push({ level: "error", msg: `${iga(p.label)} 방 밖으로 나감` });
     });
     (regions || []).forEach((r) => {
       const hit = solids.filter((p) => overlap(p, r.rect));
-      if (hit.length) out.push({ level: "error", msg: `${r.label}에 ${hit.map((h) => h.label).join(", ")}이(가) 걸림` });
+      if (hit.length) out.push({ level: "error", msg: `${r.label}에 ${iga(hit.map((h) => h.label).join(", "))} 걸림` });
       else out.push({ level: "ok", msg: `${r.label} 확보` });
     });
     return out;
@@ -290,12 +299,12 @@
     return { sofa, tv, table, tw, tl };
   }
 
-  function livingCandidates(Uc, regions, winC, sz) {
-    const b = livingBase(Uc, sz, regions);
+  function livingCandidates(Uc, regions, winC, sz, fixed, avoid) {
+    const b = livingBase(Uc, sz, avoid);
     const pref = winC.length ? centerOf(winC[0].rect) : { x: 12, y: 12 };
     const rugFor = (t) => R("rug", "러그", Math.round(t.x + t.w / 2 - 80), Math.round(t.y + t.h / 2 - 80), 160, 160, "rug");
     const list = [];
-    const baseP = [b.sofa, b.tv, b.table];
+    const baseP = [b.sofa, b.tv, b.table, ...fixed];
 
     {
       const rug = rugFor(b.table), pieces = [...baseP, rug];
@@ -304,13 +313,13 @@
       if (sp) pieces.push(R("lamp", "플로어 램프", sp.x, sp.y, 35, 35, "small"));
       list.push({ id: "A", title: "소품 추가형", cost: "구매 필요", pieces,
         changes: ["라운드 러그(지름 160cm)를 커피테이블 아래에 추가", sp ? "플로어 램프를 창 가까운 모서리에 추가" : "플로어 램프를 놓을 자리를 찾지 못함"],
-        items: ["rug", "lamp", ...LIVING_EXTRAS], extraChecks: sp ? extra : [{ level: "warn", msg: "플로어 램프를 놓을 모서리 자리가 없음" }] });
+        items: Array.from(new Set(["rug", "ottoman", "lamp", ...LIVING_EXTRAS])), extraChecks: sp ? extra : [{ level: "warn", msg: "플로어 램프를 놓을 모서리 자리가 없음" }] });
     }
     {
       const stGap = 35;
       const table = R("table", "커피테이블", b.sofa.x + b.sofa.w + stGap, b.table.y, b.tw, b.tl);
       const moved = Math.round(b.table.x - table.x);
-      const pieces = [b.sofa, b.tv, table];
+      const pieces = [b.sofa, b.tv, table, ...fixed];
       const sp = freeSpot(35, 35, pieces, regions, Uc, { x: 10, y: Math.max(10, b.sofa.y - 45) });
       if (sp) pieces.push(R("lamp", "플로어 램프", sp.x, sp.y, 35, 35, "small"));
       list.push({ id: "B", title: "재배치 0원형", cost: "0원 (기존 가구 이동)", pieces,
@@ -356,11 +365,11 @@
     return base;
   }
 
-  function bedCandidates(Uc, regions, winC, sz, hasDesk) {
+  function bedCandidates(Uc, regions, winC, sz, hasDesk, fixed, avoid) {
     const { W, D } = Uc;
-    const b = bedBase(Uc, sz, hasDesk, regions);
+    const b = bedBase(Uc, sz, hasDesk, avoid);
     const { bed, ward, desk } = b;
-    const base = hasDesk ? [bed, ward, desk] : [bed, ward];
+    const base = (hasDesk ? [bed, ward, desk] : [bed, ward]).concat(fixed);
     const pref = winC.length ? centerOf(winC[0].rect) : { x: W / 2, y: 12 };
     const nsz = S(40);
     const list = [];
@@ -379,23 +388,23 @@
       const tryDesk = (w, h) => {
         for (let wy = ward.y; wy + ward.h <= D - 5; wy += 10) {
           const w2 = R("ward", "옷장", ward.x, wy, ward.w, ward.h);
-          const pieces = [bed, w2];
+          const pieces = [bed, w2, ...fixed];
           const sp = freeSpot(w, h, pieces, regions, Uc, pref);
           if (!sp) continue;
           const d2 = R("desk", "책상", sp.x, sp.y, w, h);
-          const ps = [bed, w2, d2];
+          const ps = [bed, w2, d2, ...fixed];
           const fc = frontClear(d2, solidsOf(ps), Uc);
           if (fc >= 90 && !overlap(w2, d2)) { if (!chosen || sp.d < chosen.d) chosen = { ps, d: sp.d }; break; }
         }
       };
       tryDesk(dl, dd); tryDesk(dd, dl);
-      const ps = chosen ? chosen.ps : [bed, ward, R("desk", "책상", Math.min(bed.x + bed.w + 10, W - dl - 5), 0, dl, dd)];
+      const ps = chosen ? chosen.ps : [bed, ward, R("desk", "책상", Math.min(bed.x + bed.w + 10, W - dl - 5), 0, dl, dd), ...fixed];
       list.push({ id: "B", title: "재배치 0원형", cost: "0원 (기존 가구 이동)", pieces: ps,
         changes: ["책상을 창 가까이로 옮겨 자연광을 쓰도록 배치", "옷장 위치를 조정해 책상 앞 의자 공간(90cm 이상)을 확보", "기존 책상 자리는 비워 통로로 사용"],
         items: [], extraChecks: chosen ? [] : [{ level: "warn", msg: "의자 공간 90cm를 확보하는 책상 자리를 찾지 못해 가장 가까운 자리로 표시" }] });
     } else {
       const b2 = R("bed", "침대", Math.round((W - S(sz.bed)) / 2), 0, S(sz.bed), S(200));
-      list.push({ id: "B", title: "재배치 0원형", cost: "0원 (기존 가구 이동)", pieces: [b2, ward],
+      list.push({ id: "B", title: "재배치 0원형", cost: "0원 (기존 가구 이동)", pieces: [b2, ward, ...fixed],
         changes: ["침대를 한쪽 벽 중앙으로 옮겨 양쪽에서 오르내릴 수 있게 배치", "옷장 앞 여유 공간(80cm)을 확보"], items: [], extraChecks: [] });
     }
     if (hasDesk) {
@@ -420,7 +429,9 @@
       const probe = R("probe", "", bd.x, bd.y + bd.h / 2, bd.w, bd.h / 2);
       const open = Math.max(freeLeft(probe, solids), freeRight(probe, solids, W));
       c.checks.push(lvl(open, 40, 60, `침대 옆 통로 ${Math.round(open)}cm`, `침대 옆 통로 ${Math.round(open)}cm (최소 40cm 필요)`, `침대 옆 통로 ${Math.round(open)}cm (60cm 이상 권장)`));
-      const foot = freeDown(bd, solids, D);
+      const footSolids = solids.filter((x) => x.id !== "bookcase");
+      const halfW = bd.w / 2;
+      const foot = Math.max(freeDown(R("f1", "", bd.x, bd.y, halfW, bd.h), footSolids, D), freeDown(R("f2", "", bd.x + halfW, bd.y, halfW, bd.h), footSolids, D));
       if (foot < 60) c.checks.push({ level: "warn", msg: `침대 발치 여유 ${Math.round(foot)}cm (60cm 이상 권장)` });
       const w = by.ward;
       if (w) { const f = frontClear(w, solids, Uc); c.checks.push(lvl(f, 60, 80, `옷장 앞 여유 ${Math.round(f)}cm`, `옷장 앞 여유 ${Math.round(f)}cm (문 열림 최소 60cm 필요)`, `옷장 앞 여유 ${Math.round(f)}cm (80cm 이상 권장)`)); }
@@ -439,7 +450,9 @@
 
   // 예산 안에서 품목을 앞에서부터 담는다 (가격은 가정 범위의 중간값)
   function planPurchase(keys, budget) {
-    const items = keys.map(mkItem);
+    let items = keys.map(mkItem);
+    // 예산이 10만원 이하면 가성비 순(싼 것부터)으로 담아 더 많은 품목을 준비할 수 있게 한다
+    if (budget != null && budget <= 100000) items = items.map((it, i) => [it, i]).sort((a, b) => (a[0].price[0] + a[0].price[1]) - (b[0].price[0] + b[0].price[1]) || a[1] - b[1]).map((x) => x[0]);
     let spent = 0; const inBudget = [], over = [];
     items.forEach((it) => {
       const mid = Math.round((it.price[0] + it.price[1]) / 2);
@@ -453,6 +466,7 @@
     const o = Object.assign({ housing: "apt", target: "living", door: "sliding", locked: [], budget: null, rental: false }, opts || {});
     o.sizes = Object.assign({}, DEFAULT_SIZES, o.sizes || {});
     o.view = Object.assign({}, DEFAULT_VIEW, o.view || {});
+    o.view.obstacle = Object.assign({}, DEFAULT_VIEW.obstacle, (opts && opts.view && opts.view.obstacle) || {});
     return o;
   }
 
@@ -465,37 +479,53 @@
     const U = usableRoom(room);
     const fr = frameFor(U, opts.view.bigWall);
     const Uc = { W: fr.Wc, D: fr.Dc };
-    const winReal = windowRects(U, opts.view.windows, family === "living" ? 160 : 140);
+    const winW = (WIN_SIZES[opts.view.winSize] || WIN_SIZES.md).w;
+    const winReal = windowRects(U, opts.view.windows, winW);
     const winC = winReal.map((w) => ({ wall: w.wall, rect: fr.toCanon(w.rect) }));
     const regions = [{ label: "현관문 열림 반경", rect: fr.toCanon(entranceRect(U, opts.view.door)) }];
     if (family === "living" && opts.door === "swing" && opts.view.windows.length)
       regions.push({ label: "여닫이문 열림 반경", rect: fr.toCanon(swingRect(U, opts.view.windows[0])) });
-    return { opts, family, hasDesk, U, fr, Uc, winReal, winC, regions, target };
+    // 기둥·돌출 모서리: 움직일 수 없는 고정 장애물(실제 좌표 → 정규 좌표)
+    const ob = opts.view.obstacle, osz = (OBSTACLES[ob.size] || OBSTACLES.none).s;
+    let fixed = [];
+    if (osz > 0) {
+      const rx = ob.corner === "fr" || ob.corner === "nr" ? U.W - osz : 0, ry = ob.corner === "nl" || ob.corner === "nr" ? U.D - osz : 0;
+      fixed = [Object.assign(R("pillar", "기둥·돌출", 0, 0, osz, osz, "fixed"), fr.toCanon({ x: rx, y: ry, w: osz, h: osz }))];
+    }
+    const avoid = regions.concat(fixed.map((f) => ({ label: "고정 장애물", rect: f })));
+    return { opts, family, hasDesk, U, fr, Uc, winReal, winC, regions, target, fixed, avoid, winW };
   }
 
   function finalize(c, ctx) {
     c.pieces = c.pieces.map((p) => Object.assign({}, p, ctx.fr.toReal(p)));
     c.regions = ctx.regions.map((r) => ({ label: r.label, rect: ctx.fr.toReal(r.rect) }));
     c.usable = ctx.U; c.family = ctx.family;
-    c.view = { windows: ctx.winReal.map((w) => w.wall), door: ctx.opts.view.door };
+    c.view = { windows: ctx.winReal.map((w) => w.wall), door: ctx.opts.view.door, winW: ctx.winW };
   }
 
   function candidates(room, optsIn) {
     const ctx = setup(room, optsIn), { opts } = ctx;
-    const built = ctx.family === "living" ? livingCandidates(ctx.Uc, ctx.regions, ctx.winC, opts.sizes) : bedCandidates(ctx.Uc, ctx.regions, ctx.winC, opts.sizes, ctx.hasDesk);
+    const built = ctx.family === "living" ? livingCandidates(ctx.Uc, ctx.regions, ctx.winC, opts.sizes, ctx.fixed, ctx.avoid) : bedCandidates(ctx.Uc, ctx.regions, ctx.winC, opts.sizes, ctx.hasDesk, ctx.fixed, ctx.avoid);
     const locked = new Set(opts.locked || []);
     built.list.forEach((c) => {
-      c.blocked = false;
+      c.blocked = false; c.blockedBy = [];
       Object.values(built.base).forEach((bp) => {
         if (!bp || !bp.id || !locked.has(bp.id)) return;
         const np = c.pieces.find((p) => p.id === bp.id);
         if (np && (Math.abs(np.x - bp.x) > 1 || Math.abs(np.y - bp.y) > 1 || Math.abs(np.w - bp.w) > 1)) {
-          c.checks.unshift({ level: "error", msg: `${bp.label}은(는) 이동 불가로 지정돼 이 안은 적용할 수 없어요` });
-          c.blocked = true;
+          c.checks.unshift({ level: "error", msg: `${eunn(bp.label)} 이동 불가로 지정돼 이 안은 적용할 수 없어요` });
+          c.blocked = true; c.blockedBy.push(bp.id);
         }
       });
       c.score = c.blocked ? 0 : score(c.checks);
       c.purchase = planPurchase(c.items, opts.budget);
+      // 이 방에서 놓을 자리를 확인했는지(구매 전 불안 줄이기)
+      const pm = { rug: "rug", rugSmall: "rug", lamp: "lamp", chair: "chair", nightstand: "ns", bookcase: "bookcase", desk: "desk" };
+      c.purchase.inBudget.forEach((it) => {
+        const pid = pm[it.key];
+        it.fit = pid ? (c.pieces.find((p) => p.id === pid) ? "이 방에서 놓을 자리를 확인했어요" : "놓을 자리를 찾지 못했어요. 더 작은 크기를 고려하세요")
+          : ["ottoman", "sidetable", "plant", "mirror"].includes(it.key) ? "바닥에 놓는 소품이에요. 놓을 자리를 직접 한 번 재보세요" : "놓을 공간을 거의 차지하지 않는 소품이에요";
+      });
       c.rentalNote = opts.rental && c.items.some((k) => RENTAL_SENSITIVE.includes(k)) ? "임대: 못·타공 없이 쓰는 제품만 고르세요" : "";
       c.prompt = c.changes.join(". ") + ". " + FIXED_PROMPT;
       finalize(c, ctx);
@@ -507,8 +537,9 @@
   function currentScene(room, optsIn) {
     const ctx = setup(room, optsIn);
     let pieces;
-    if (ctx.family === "living") { const b = livingBase(ctx.Uc, ctx.opts.sizes, ctx.regions); pieces = [b.sofa, b.tv, b.table]; }
-    else { const b = bedBase(ctx.Uc, ctx.opts.sizes, ctx.hasDesk, ctx.regions); pieces = ctx.hasDesk ? [b.bed, b.ward, b.desk] : [b.bed, b.ward]; }
+    if (ctx.family === "living") { const b = livingBase(ctx.Uc, ctx.opts.sizes, ctx.avoid); pieces = [b.sofa, b.tv, b.table]; }
+    else { const b = bedBase(ctx.Uc, ctx.opts.sizes, ctx.hasDesk, ctx.avoid); pieces = ctx.hasDesk ? [b.bed, b.ward, b.desk] : [b.bed, b.ward]; }
+    pieces = pieces.concat(ctx.fixed);
     const c = { title: "현재 구조", pieces, checks: [] };
     finalize(c, ctx);
     return c;
@@ -532,6 +563,39 @@
 
   function anyApplicable(cs) { return cs.some((c) => !c.blocked); }
 
+  /* ---------- 견적서를 열 때마다 달라지는 제안 ----------
+   * 실제 가격·재고 데이터가 없으므로 가격이 내려갔다는 식의 제안은 하지 않는다(가짜 정보 금지).
+   * 지금은 견적서 내용(진행 상황·점검 결과·예산·다른 안)에서 만들 수 있는 제안만 한다. */
+  function suggestions(cands, candId, checkedKeys, budget, views, ctx) {
+    ctx = ctx || {};
+    const c = cands.find((x) => x.id === candId);
+    if (!c) return [];
+    const done = new Set(checkedKeys || []);
+    const todo = c.purchase.inBudget.filter((i) => !done.has(i.key));
+    const pool = [];
+    if (todo.length) pool.push({ kind: "next", title: "다음으로 할 일", body: `${todo[0].name}부터 해보세요 (${todo[0].diff}, 약 ${todo[0].min}분). 먼저 ${todo[0].steps[0]}` });
+    else if (c.purchase.inBudget.length) pool.push({ kind: "done", title: "모두 준비했어요", body: "견적서의 품목을 모두 준비했어요. 설치한 모습은 다른 방 견적에도 참고해보세요." });
+    const free = cands.find((x) => x.id !== c.id && !x.blocked && x.purchase.total === 0 && x.score >= c.score - 10);
+    if (free && c.purchase.total > 0) pool.push({ kind: "free", title: "돈 안 드는 방법도 있어요", body: `${free.title}: ${free.changes[0]}. 구매 전에 먼저 해보고 부족할 때 사도 늦지 않아요.` });
+    const over = c.purchase.over[0];
+    if (over) { const need = Math.max(0, c.purchase.total + over.mid - budget); pool.push({ kind: "upsell", title: "예산을 조금 늘리면", body: `예산을 약 ${need.toLocaleString("ko-KR")}원(임시 가정 가격) 늘리면 ${over.name}도 담을 수 있어요.` }); }
+    const tight = c.checks.filter((k) => k.level === "warn" || k.level === "error")[0];
+    pool.push({ kind: "measure", title: "사기 전에 한 번 더 재볼까요", body: tight ? `가장 여유가 적은 곳은 "${tight.msg}"이에요. 구매 전에 줄자로 확인하세요.` : "여유 있게 들어가는 구성이에요. 그래도 구매 전에 놓을 자리를 한 번 재보세요." });
+    pool.push({ kind: "compare", title: "판매처를 비교해보세요", body: "같은 품목도 쿠팡·네이버쇼핑·오늘의집에서 가격과 배송이 다를 수 있어요. 가격은 판매처에서 직접 확인하세요." });
+    const tier = [50000, 150000, 300000, 500000, 1000000].find((t) => t > budget);
+    if (tier) { const alt = planPurchase(c.items, tier), gain = alt.inBudget.length - c.purchase.inBudget.length;
+      if (gain > 0) pool.push({ kind: "budget", title: "예산을 바꿔보면", body: `예산을 ${tier / 10000}만원으로 올리면 ${alt.inBudget.length}개(+${gain}개)까지 준비할 수 있어요. 견적서 위쪽에서 예산을 바꿔볼 수 있어요.` }); }
+    pool.push({ kind: "timing", title: "급하지 않다면", body: "판매처의 세일 일정을 확인하고 사는 방법도 있어요. 가격은 시기마다 달라질 수 있어요." });
+    if ([3, 4, 9, 10].includes(ctx.month)) pool.push({ kind: "season", title: "이사철이에요", body: "3~4월과 9~10월은 가구 수요가 몰리는 시기로 알려져 있어요. 배송·설치 일정은 판매처에서 미리 확인하세요." });
+    if (ctx.daysOld >= 7) pool.push({ kind: "stale", title: `견적서를 만든 지 ${ctx.daysOld}일 지났어요`, body: "가격과 재고는 달라졌을 수 있어요. 구매 전에 판매처에서 다시 확인하세요." });
+    pool.push({ kind: "nextroom", title: "다른 방도 꾸며볼까요?", body: "같은 방식으로 침실이나 작은방 견적도 받아볼 수 있어요." });
+    const tipItem = c.purchase.inBudget[(views || 0) % Math.max(1, c.purchase.inBudget.length)];
+    if (tipItem) pool.push({ kind: "tip", title: `${tipItem.name} 설치 팁`, body: tipItem.steps.join(" → ") });
+    const v = Math.max(0, views || 0), out = [];
+    for (let i = 0; i < Math.min(2, pool.length); i++) out.push(pool[(v * 2 + i) % pool.length]);
+    return out;
+  }
+
   /* ---------- 견적서: 구매를 단계로 나누고 요약한다 (PDF 저장·공유용) ---------- */
   function buildQuote(cand, meta) {
     const inB = cand.purchase.inBudget;
@@ -543,6 +607,7 @@
     phases.forEach((p) => { p.subtotal = p.items.reduce((s, i) => s + i.mid, 0); });
     return { id: "Q" + Date.now().toString(36).toUpperCase(), plan: cand.id + ". " + cand.title, cost: cand.cost, meta,
       phases, total: cand.purchase.total, excluded: cand.purchase.over, changes: cand.changes, checks: cand.checks,
+      precheck: ["배송 예정일과 도착 방식(설치·조립 포함 여부)", "반품·교환 시 비용(반품비, 위약금)", "배송비가 별도로 붙는지(무료배송 조건)", "실물 색상·크기 후기(사진과 다를 수 있음)"],
       notices: ["가격은 임시 가정 범위이며 판매처의 실제 가격과 재고를 확인하세요.", "AI 이미지는 참고용이며 실제와 다를 수 있습니다.",
         "제휴 링크가 포함될 수 있습니다. 현재는 수수료 없는 검색 링크입니다.", "치수는 일반 가정값이므로 구매 전에 실측으로 확인하세요."] };
   }
@@ -557,7 +622,7 @@
     const vw = px(W) + m * 2, vh = px(D) + m * 2 + 12;
     let o = `<svg viewBox="0 0 ${vw} ${vh}" xmlns="http://www.w3.org/2000/svg" role="img" aria-label="평면도 ${cand.title}">`;
     o += `<rect x="${m}" y="${m}" width="${px(W)}" height="${px(D)}" fill="none" stroke="var(--fg)" stroke-width="2"/>`;
-    const ww = cand.family === "living" ? 160 : 140;
+    const ww = (cand.view && cand.view.winW) || 150;
     (cand.view && cand.view.windows || []).forEach((wall) => {
       if (wall === "far") { const w = px(Math.min(ww, W - 40)); o += `<rect x="${m + (px(W) - w) / 2}" y="${m - 3}" width="${w}" height="6" fill="var(--acc)"/><text x="${m + px(W) / 2}" y="${m - 8}" font-size="9" text-anchor="middle" fill="var(--mut)">창</text>`; }
       else { const h2 = px(Math.min(ww, D - 40)), x = wall === "left" ? m - 3 : m + px(W) - 3; o += `<rect x="${x}" y="${m + (px(D) - h2) / 2}" width="6" height="${h2}" fill="var(--acc)"/><text x="${wall === "left" ? m - 10 : m + px(W) + 10}" y="${m + px(D) / 2}" font-size="9" text-anchor="middle" fill="var(--mut)">창</text>`; }
@@ -575,7 +640,8 @@
       const lk = locked.has(p.id);
       const fill = lk ? "var(--lock)" : "var(--card)";
       const attrs = opts.interactive && !["rug", "small"].includes(p.kind) ? ` data-id="${p.id}" style="cursor:pointer"` : "";
-      if (p.kind === "rug") o += `<${p.w === p.h ? `circle cx="${x + w / 2}" cy="${y + hh / 2}" r="${w / 2}"` : `rect x="${x}" y="${y}" width="${w}" height="${hh}" rx="8"`} fill="var(--acc)" fill-opacity=".15" stroke="var(--acc)" stroke-dasharray="4 3"/>`;
+      if (p.kind === "fixed") o += `<rect x="${x}" y="${y}" width="${w}" height="${hh}" fill="var(--line)" stroke="var(--fg)" stroke-dasharray="2 2"/><text x="${x + w / 2}" y="${y + hh / 2 + 3}" font-size="8" text-anchor="middle" fill="var(--fg)">기둥</text>`;
+      else if (p.kind === "rug") o += `<${p.w === p.h ? `circle cx="${x + w / 2}" cy="${y + hh / 2}" r="${w / 2}"` : `rect x="${x}" y="${y}" width="${w}" height="${hh}" rx="8"`} fill="var(--acc)" fill-opacity=".15" stroke="var(--acc)" stroke-dasharray="4 3"/>`;
       else if (p.kind === "small") o += `<circle cx="${x + w / 2}" cy="${y + hh / 2}" r="${w / 2}" fill="var(--card)" stroke="var(--fg)"/>`;
       else {
         o += `<g${attrs}><rect x="${x}" y="${y}" width="${w}" height="${hh}" rx="3" fill="${fill}" stroke="var(--fg)" stroke-width="${lk ? 2 : 1}"/>`;
@@ -588,7 +654,7 @@
 
   const api = { PAD, ROOM_SHRINK, PYEONG, HOUSING, TARGETS, SHAPES, SIZE_OPTIONS, DEFAULT_SIZES, TARGET_DEFAULTS,
     WALLS, BIG_WALLS, DOOR_POS, DEFAULT_VIEW, MERCHANTS, FIXED_PROMPT, ITEM,
-    roomFor, suggestSizes, candidates, currentScene, anyApplicable, buildQuote, svg, score, planPurchase, usableRoom };
+    WIN_SIZES, OBSTACLES, CORNERS, roomFor, suggestSizes, candidates, currentScene, anyApplicable, suggestions, buildQuote, svg, score, planPurchase, usableRoom };
   if (typeof module !== "undefined" && module.exports) module.exports = api;
   else root.LayoutEngine = api;
 })(typeof window !== "undefined" ? window : globalThis);

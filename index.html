@@ -44,7 +44,7 @@ footer{margin-top:32px;font-size:12px;color:var(--mut)}
     <li><b>1.</b> 집 종류(아파트·빌라·원룸·오피스텔)와 평형, 방 모양을 그림으로 고르기</li>
     <li><b>2.</b> 문을 열고 들어서서 본 모습(창·큰 가구·문 위치)과 우리 집 가구 크기를 고르기</li>
     <li><b>3.</b> 예산(5만~100만원, 직접 입력 가능)에 맞춰 가구가 들어가는지 계산한 배치 3안과 평면도 확인</li>
-    <li><b>4.</b> 직접 하는 방법과 구매 리스트, 단계별 견적서를 PDF로 저장</li>
+    <li><b>4.</b> 직접 하는 방법과 구매 리스트가 담긴 견적서를 받기 (앱에 보관되어 언제든 다시 열 수 있어요)</li>
   </ol>
 
   <p><a class="cta" href="demo/index.html" style="margin-top:8px">직접 써보기 (프로토타입)</a></p>
@@ -80,6 +80,11 @@ footer{margin-top:32px;font-size:12px;color:var(--mut)}
   </div>
   <footer>AI가 만든 이미지는 참고용이며 실제와 다를 수 있습니다. 상품 가격·재고는 판매처에서 확인하세요.</footer>
 </main>
+<script>
+// 방문 측정(기본 꺼짐). 쿠키 없이 세는 서비스(예: GoatCounter) 주소를 넣으면 켜집니다. 설정 방법: docs/ANALYTICS.md
+const ANALYTICS_URL = "";
+if (ANALYTICS_URL) { const sc = document.createElement("script"); sc.async = true; sc.dataset.goatcounter = ANALYTICS_URL; sc.src = "//gc.zgo.at/count.js"; document.head.appendChild(sc); }
+</script>
 <script>
 // 대기자 신청 폼 주소(구글폼 등)를 직접 만들어 여기에 넣으세요. 비어 있으면 버튼이 안내만 표시합니다.
 const FORM_URL = "https://forms.gle/8q7s5zwvKPBPFJJaA";
