@@ -194,9 +194,9 @@ textarea{width:100%;font:12px/1.5 ui-monospace,monospace;background:var(--bg);co
   <section id="quote" hidden></section>
   <p class="mut" style="margin-top:24px">AI 이미지는 참고용이며 실제와 다를 수 있습니다. 가구 치수·간격·가격은 일반 가정값이며 실측과 판매처 가격으로 확인하세요. 상품 링크는 각 쇼핑몰의 검색 링크로, 제휴 승인 전이라 수수료가 없는 임시 링크입니다. 제휴가 시작되면 화면 상단과 견적서에 대가성 문구를 표시합니다.</p>
 </main>
-<script src="layout.js?v=1791208612"></script>
-<script src="samples.js?v=1791208612"></script>
-<script src="editor.js?v=1791208612"></script>
+<script src="layout.js?v=1791209177"></script>
+<script src="samples.js?v=1791209177"></script>
+<script src="editor.js?v=1791209177"></script>
 <script src="samples.local.js" onerror="this.remove()"></script>
 <script>
 // 방문·이용 측정(기본 꺼짐). 쿠키 없이 세는 서비스(예: GoatCounter)의 주소를 넣으면 켜집니다.
@@ -494,6 +494,21 @@ let LAST = null;
 // 가격 조사 결과(prices.json)가 있으면 가정 범위 대신 사용한다(없으면 가정 범위 그대로).
 fetch("prices.json").then((r) => r.ok ? r.json() : null).then((d) => { if (!d || !d.items) return;
   Object.entries(d.items).forEach(([k, v]) => { if (E.ITEM[k]) { E.ITEM[k].price = [v[0], v[1]]; E.ITEM[k].priceNote = `${d.date} ${d.label || "조사"}`; } }); }).catch(() => {});
+// 사진 합성(AI) 서버 함수 주소. 배포 후 여기에 넣는다(workers/compose). 비어 있으면 버튼이 나타나지 않는다.
+const COMPOSE_URL = "https://room-compose.eyewear-fit.workers.dev";
+function whereOf(pin) { if (!pin) return "natural spot"; return `${pin.y < 40 ? "upper" : pin.y > 65 ? "lower" : "middle"} ${pin.x < 35 ? "left" : pin.x > 65 ? "right" : "center"}`; }
+function resizeBlob(src, max) { return new Promise((res, rej) => { const im = new Image(); im.crossOrigin = "anonymous"; im.onload = () => { const c = document.createElement("canvas"); c.width = c.height = max; c.getContext("2d").drawImage(im, 0, 0, max, max); /* 모델이 정사각형으로 출력하므로 늘려서 보내고, 결과는 원래 비율로 되돌려 보여준다 */ c.toBlob((b) => b ? res({ b, w: im.width, h: im.height }) : rej(new Error("blob")), "image/jpeg", 0.85); }; im.onerror = () => rej(new Error("img")); im.src = src; }); }
+async function composeNow(rec, c, photoSrc) {
+  const box = $("#composeOut"); box.innerHTML = '<p class="mut">AI가 사진에 적용하는 중이에요(약 10~30초)…</p>';
+  try {
+    const form = new FormData(), pr = await resizeBlob(photoSrc, 768); form.append("photo", pr.b, "room.jpg"); form.append("width", 768); form.append("height", 768);
+    form.append("items", JSON.stringify(c.purchase.inBudget.slice(0, 8).map((i) => ({ name: i.name, size: i.size, where: whereOf((rec.pins || {})[i.key]) }))));
+    const r = await fetch(COMPOSE_URL, { method: "POST", body: form }), d = await r.json();
+    if (!d.image) throw new Error(d.error || "fail");
+    box.innerHTML = `<div style="position:relative;line-height:0"><img src="data:image/jpeg;base64,${d.image}" alt="AI 적용 예시" style="width:100%;aspect-ratio:${pr.w} / ${pr.h};object-fit:fill;border-radius:10px"><span style="position:absolute;right:8px;bottom:8px;background:rgba(0,0,0,.55);color:#fff;border-radius:6px;padding:2px 6px;font-size:12px;line-height:1.4">✦ AI 생성</span></div><p class="mut">AI가 만든 예시예요. 실제 제품의 모양·색·크기와 다를 수 있고 위치도 정확하지 않을 수 있어요.</p>`;
+    track("compose-ok");
+  } catch (e) { box.innerHTML = `<p class="mut">${esc(e.message === "fail" ? "생성에 실패했어요." : e.message)} 잠시 후 다시 시도해주세요.</p>`; track("compose-fail"); }
+}
 const REG = {}; // 제품 보기용: 품목 키 → 품목
 const reg = (items) => items.forEach((i) => { REG[i.key] = i; });
 const itemHtml = (it, over) => Editor.row(it, over);
@@ -633,7 +648,7 @@ function renderQuote(rec) {
     <h3>진행 상황 <span class="mut">${done.size}/${total}개 준비</span></h3><div class="bar"><i style="width:${total ? Math.round(done.size / total * 100) : 0}%"></i></div>
     <table>${Object.entries(meta).map(([k, v]) => `<tr><th>${esc(k)}</th><td colspan="2">${esc(v)}</td></tr>`).join("")}<tr><th>추천 안</th><td colspan="2">${esc(q.plan)} (${esc(q.cost)})</td></tr></table>
     <h3>내 방 사진에서 보는 진행 상황</h3>${photoPanel(rec, c, done)}
-    <h3>구매 품목을 적용한 모습</h3>${Editor.preview(c.purchase.inBudget, { family: c.family, photo: ph0, pins: rec.pins && Object.keys(rec.pins).length ? rec.pins : null })}
+    <h3>구매 품목을 적용한 모습</h3>${COMPOSE_URL && ph0 ? `<button class="cta ghost" type="button" data-compose="1">AI로 내 방에 적용해 보기 (무료 체험)</button><div id="composeOut"></div>` : ""}${Editor.preview(c.purchase.inBudget, { family: c.family, photo: ph0, pins: rec.pins && Object.keys(rec.pins).length ? rec.pins : null })}
     <details><summary>${rec.layout ? "내가 직접 배치한 도면" : "참고 배치도(도면 보기)"}</summary>${E.svg(r, rec.layout ? Object.assign({}, c, { pieces: rec.layout }) : c, { locked: rec.st.locked })}</details>
     <h3>이렇게 바꿔요</h3><ol>${q.changes.map((x) => `<li>${esc(x)}</li>`).join("")}</ol>
     ${q.phases.length ? q.phases.map((p) => `<h3>${esc(p.title)} <span class="mut">소계 약 ${won(p.subtotal)}</span></h3>
@@ -689,6 +704,7 @@ document.addEventListener("click", (e) => {
   const un = e.target.closest("[data-unlock]");
   if (un) { un.dataset.unlock.split(",").filter(Boolean).forEach((id) => st.locked.delete(id)); const out = $("#out"); renderLock(); renderAdvSummary(); $("#go").click(); return; }
   const op = e.target.closest("[data-open]"); if (op) { openQuote(op.dataset.open); return; }
+  if (e.target.closest("[data-compose]")) { const rec = loadQ().find((q) => q.id === curQuoteId()); if (rec) { const { cs } = restore(rec), c = cs.find((x) => x.id === rec.candId), sm = rec.sampleId ? sampleOf(rec.sampleId) : null; composeNow(rec, c, sm ? sm.img : photoOf(rec.id)); } return; }
   const vw = e.target.closest("[data-view]"); if (vw && REG[vw.dataset.view]) { Editor.showItem(REG[vw.dataset.view]); return; }
   const rz = e.target.closest("[data-raise]"); if (rz) { st.budget = Number(rz.dataset.raise); st.customBudget = !BUDGETS.includes(st.budget / 10000); st.chosen.budget = true; renderBudget(); track("budget-raised"); $("#go").click(); return; }
   const ed = e.target.closest("[data-edit]"); if (ed && LAST) { const c = LAST.cs.find((x) => x.id === ed.dataset.edit); if (c) Editor.open(c, LAST.r, (pcs) => saveAndOpen(c.id, pcs)); return; }
