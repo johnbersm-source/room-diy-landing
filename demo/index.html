@@ -37,6 +37,10 @@ input[type=number]{width:96px;font:inherit;padding:8px;border-radius:8px;border:
 .chk li.error::before{content:"✕ ";color:var(--err)}
 .chk li.error{color:var(--err)}
 .score{float:right;font-weight:700}
+.rec{float:right;font-size:13px;font-weight:700;border-radius:999px;padding:3px 10px}
+.rec2{background:var(--acc);color:#fff}.rec1{background:#e6f2ea;color:#1f5e3b;border:1px solid var(--acc)}
+.fair{background:#fff3cf;color:#6b4a00;border-radius:8px;padding:7px 10px;margin:6px 0;font-size:13px}
+@media(prefers-color-scheme:dark){.rec2{color:#0b2a1a}.rec1{background:#1c3a2a;color:#bfe8cf}.fair{background:#4a3a10;color:#ffe9a8}}
 .buy{border-top:1px solid var(--line);margin-top:10px;padding-top:8px}
 .item{background:var(--bg);border-radius:10px;padding:10px;margin:8px 0}
 .item b{font-size:15px}.item .meta{font-size:12px;color:var(--mut)}
@@ -195,10 +199,10 @@ textarea{width:100%;font:12px/1.5 ui-monospace,monospace;background:var(--bg);co
   <section id="quote" hidden></section>
   <p class="mut" style="margin-top:24px">AI 이미지는 참고용이며 실제와 다를 수 있습니다. 가구 치수·간격·가격은 일반 가정값이며 실측과 판매처 가격으로 확인하세요. 상품 링크는 각 쇼핑몰의 검색 링크로, 제휴 승인 전이라 수수료가 없는 임시 링크입니다. 제휴가 시작되면 화면 상단과 견적서에 대가성 문구를 표시합니다.</p>
 </main>
-<script src="layout.js?v=1791212447"></script>
-<script src="samples.js?v=1791212447"></script>
-<script src="editor.js?v=1791212447"></script>
-<script src="board.js?v=1791212447"></script>
+<script src="layout.js?v=1791236144"></script>
+<script src="samples.js?v=1791236144"></script>
+<script src="editor.js?v=1791236144"></script>
+<script src="board.js?v=1791236144"></script>
 <script src="samples.local.js" onerror="this.remove()"></script>
 <script>
 // 방문·이용 측정(기본 꺼짐). 쿠키 없이 세는 서비스(예: GoatCounter)의 주소를 넣으면 켜집니다.
@@ -545,6 +549,13 @@ $("#go").addEventListener("click", () => {
   LAST = { r, opts, cs };
   const okScores = cs.filter((c) => !c.blocked).map((c) => c.score);
   const best = okScores.length ? Math.max(...okScores) : null;
+  // 비용이 드는 안만 판단해 추천 표시(점수는 보여주지 않는다): 점검 오류가 없는 안 중 점수가 가장 높은 안은 "매우 추천", 나머지는 "추천"
+  const REC = {}; const costed = cs.filter((c) => !c.blocked && c.purchase.total > 0 && !c.checks.some((k) => k.level === "error"));
+  const ranked = [...costed].sort((a, b) => b.score - a.score || a.purchase.total - b.purchase.total);
+  ranked.forEach((c, i) => { REC[c.id] = i === 0 ? 2 : 1; });
+  // 적정 가격: 방 면적에 따라 사면 좋은 품목 수(작은 방 3개 ~ 큰 방 8개)를 우선순위대로 담은 중간 예상가 합계(조사/가정 가격 기준)
+  const rr = room(), nFair = Math.min(8, Math.max(3, Math.round((rr.W * rr.D / 10000) / 3)));
+  const fairOf = (c) => { const all = E.planPurchase(c.items, null).inBudget.slice(0, nFair); return { n: all.length, lo: all.reduce((t, i) => t + i.price[0], 0), hi: all.reduce((t, i) => t + i.price[1], 0), mid: all.reduce((t, i) => t + i.mid, 0) }; };
   const names = Object.fromEntries(E.currentScene(r, engineOpts()).pieces.map((p) => [p.id, p.label]));
   const lockNote = st.locked.size ? `<p class="mut">이동 불가: ${[...st.locked].map((id) => esc(names[id] || id)).join(", ")}</p>` : "";
   $("#out").innerHTML = `<h2>추천 (${esc(H().label)} ${esc(E.TARGETS[st.target].label)} · ${r.W}×${r.D}cm · 예산 ${won(st.budget)})</h2>
@@ -552,7 +563,7 @@ $("#go").addEventListener("click", () => {
     ${st.photo ? `<p class="mut">${st.sampleId ? "예시 방 (Before)" : "내 방 (Before)"}</p><img src="${st.photo}" alt="내 방 사진" style="max-width:100%;border-radius:10px">` : ""}` +
     (E.anyApplicable(cs) ? "" : `<p class="mut"><b>이동 불가로 지정한 가구 때문에 적용할 수 있는 안이 없어요.</b> 일부를 해제해보세요.</p>`) +
     (cs.some((c) => !c.blocked && c.purchase.total === 0 && c.score === best) && cs.some((c) => !c.blocked && c.items.length) ? `<p class="mut">💡 돈이 안 드는 재배치(B)부터 해보고, 분위기를 더 바꾸고 싶으면 A·C의 소품을 더하는 순서가 좋아요.</p>` : "") +
-    cs.map((c) => {
+    [...cs].sort((a, b) => (REC[b.id] || 0) - (REC[a.id] || 0) || (a.blocked - b.blocked)).map((c) => {
       const p = c.purchase;
       reg(p.inBudget.concat(p.over));
       const buy = c.items.length
@@ -562,9 +573,10 @@ $("#go").addEventListener("click", () => {
             ${p.over.length ? `<p class="mut">예산 초과로 제외: ${p.over.map((i) => esc(i.name)).join(", ")}</p>` : ""}
             ${Editor.more(p, st.budget, "data-raise")}
             ${c.rentalNote ? `<p class="mut">${esc(c.rentalNote)}</p>` : ""}
-            <p class="mut">가격은 임시 가정 범위예요. 아이콘을 누르면 제품 설명과 판매처를 볼 수 있어요.</p></div>`
+            <p class="mut">가격은 품목 옆의 조사 기준(또는 임시 가정)을 확인하세요. 아이콘을 누르면 제품 설명과 판매처를 볼 수 있어요.</p></div>`
         : `<div class="buy"><b>구매 없이 가능</b><p class="mut">기존 가구만 옮기는 안입니다. 이동 순서: ${c.changes.map(esc).join(" → ")}</p></div>`;
-      return `<div class="cand${c.blocked ? " blocked" : ""}"><h3>${c.id}. ${esc(c.title)} ${c.score === best && !c.blocked ? "· 가장 무난" : ""}<span class="score">${c.blocked ? "적용 불가" : c.score + "점"}</span></h3>
+      const lv = REC[c.id] || 0, fair = p.max > 0 && !c.blocked ? (() => { const f = fairOf(c); return `<div class="fair">이 방(${esc(rr.W + "×" + rr.D + "cm")})에는 우선순위 ${f.n}가지를 <b>약 ${won(Math.round(f.mid / 1000) * 1000)}</b>(${won(Math.round(f.lo / 1000) * 1000)}~${won(Math.round(f.hi / 1000) * 1000)})에 하는 것이 적정해요${st.budget >= f.mid ? "" : ` · 예산 ${won(st.budget)}으로는 일부만`}</div>`; })() : "";
+      return `<div class="cand${c.blocked ? " blocked" : ""}"><h3>${c.id}. ${esc(c.title)}${c.blocked ? '<span class="score">적용 불가</span>' : lv === 2 ? '<span class="rec rec2">매우 추천</span>' : lv === 1 ? '<span class="rec rec1">추천</span>' : ""}</h3>${fair}
         <div class="mut">${esc(c.cost)}</div>
         ${E.svg(r, c, { locked: [...st.locked] })}
         <ul class="chk">${c.checks.map((k) => `<li class="${k.level}">${esc(k.msg)}</li>`).join("")}</ul>
