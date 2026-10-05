@@ -199,10 +199,10 @@ textarea{width:100%;font:12px/1.5 ui-monospace,monospace;background:var(--bg);co
   <section id="quote" hidden></section>
   <p class="mut" style="margin-top:24px">AI 이미지는 참고용이며 실제와 다를 수 있습니다. 가구 치수·간격·가격은 일반 가정값이며 실측과 판매처 가격으로 확인하세요. 상품 링크는 각 쇼핑몰의 검색 링크로, 제휴 승인 전이라 수수료가 없는 임시 링크입니다. 제휴가 시작되면 화면 상단과 견적서에 대가성 문구를 표시합니다.</p>
 </main>
-<script src="layout.js?v=1791236171"></script>
-<script src="samples.js?v=1791236171"></script>
-<script src="editor.js?v=1791236171"></script>
-<script src="board.js?v=1791236171"></script>
+<script src="layout.js?v=1791237048"></script>
+<script src="samples.js?v=1791237048"></script>
+<script src="editor.js?v=1791237048"></script>
+<script src="board.js?v=1791237048"></script>
 <script src="samples.local.js" onerror="this.remove()"></script>
 <script>
 // 방문·이용 측정(기본 꺼짐). 쿠키 없이 세는 서비스(예: GoatCounter)의 주소를 넣으면 켜집니다.
@@ -515,8 +515,8 @@ async function composeBoard(photoSrc, placed) {
   if (!d.image) throw new Error(d.error || "생성에 실패했어요.");
   track("compose-ok"); return "data:image/jpeg;base64," + d.image;
 }
-function openBoard(c, photoSrc, pins, onSave) {
-  Board.open({ photo: photoSrc, names: itemNames(), items: c.purchase.inBudget.map((i) => i.key).filter((k) => Board.SLOT[k]), pins: pins || {}, onSave,
+function openBoard(c, photoSrc, pins, onSave, keys) {
+  Board.open({ photo: photoSrc, names: itemNames(), items: (keys || c.purchase.inBudget.map((i) => i.key)).filter((k) => Board.SLOT[k]), pins: pins || {}, onSave,
     compose: COMPOSE_URL ? (placed) => composeBoard(photoSrc, placed) : null });
 }
 async function composeNow(rec, c, photoSrc) {
@@ -554,8 +554,10 @@ $("#go").addEventListener("click", () => {
   const ranked = [...costed].sort((a, b) => b.score - a.score || a.purchase.total - b.purchase.total);
   ranked.forEach((c, i) => { REC[c.id] = i === 0 ? 2 : 1; });
   // 적정 가격: 방 면적에 따라 사면 좋은 품목 수(작은 방 3개 ~ 큰 방 8개)를 우선순위대로 담은 중간 예상가 합계(조사/가정 가격 기준)
-  const rr = room(), nFair = Math.min(8, Math.max(3, Math.round((rr.W * rr.D / 10000) / 3)));
-  const fairOf = (c) => { const all = E.planPurchase(c.items, null).inBudget.slice(0, nFair); return { n: all.length, lo: all.reduce((t, i) => t + i.price[0], 0), hi: all.reduce((t, i) => t + i.price[1], 0), mid: all.reduce((t, i) => t + i.mid, 0) }; };
+  const rr = room(), areaM2 = rr.W * rr.D / 10000,
+    // 방 종류별 적정 품목 수(가정): 거실은 면적/3(3~8), 안방·작은방은 면적/3.5(3~6), 원룸은 면적/3(3~7)
+    nFair = st.target === "living" ? Math.min(8, Math.max(3, Math.round(areaM2 / 3))) : st.target === "room" ? Math.min(7, Math.max(3, Math.round(areaM2 / 3))) : Math.min(6, Math.max(3, Math.round(areaM2 / 3.5)));
+  const fairOf = (c) => { const full = E.planPurchase(c.items, null).inBudget, all = full.slice(0, nFair), min3 = full.slice(0, 3).reduce((t, i) => t + i.mid, 0); return { min3, n: all.length, lo: all.reduce((t, i) => t + i.price[0], 0), hi: all.reduce((t, i) => t + i.price[1], 0), mid: all.reduce((t, i) => t + i.mid, 0) }; };
   const names = Object.fromEntries(E.currentScene(r, engineOpts()).pieces.map((p) => [p.id, p.label]));
   const lockNote = st.locked.size ? `<p class="mut">이동 불가: ${[...st.locked].map((id) => esc(names[id] || id)).join(", ")}</p>` : "";
   $("#out").innerHTML = `<h2>추천 (${esc(H().label)} ${esc(E.TARGETS[st.target].label)} · ${r.W}×${r.D}cm · 예산 ${won(st.budget)})</h2>
@@ -575,7 +577,7 @@ $("#go").addEventListener("click", () => {
             ${c.rentalNote ? `<p class="mut">${esc(c.rentalNote)}</p>` : ""}
             <p class="mut">가격은 품목 옆의 조사 기준(또는 임시 가정)을 확인하세요. 아이콘을 누르면 제품 설명과 판매처를 볼 수 있어요.</p></div>`
         : `<div class="buy"><b>구매 없이 가능</b><p class="mut">기존 가구만 옮기는 안입니다. 이동 순서: ${c.changes.map(esc).join(" → ")}</p></div>`;
-      const lv = REC[c.id] || 0, fair = p.max > 0 && !c.blocked ? (() => { const f = fairOf(c); return `<div class="fair">이 방(${esc(rr.W + "×" + rr.D + "cm")})에는 우선순위 ${f.n}가지를 <b>약 ${won(Math.round(f.mid / 1000) * 1000)}</b>(${won(Math.round(f.lo / 1000) * 1000)}~${won(Math.round(f.hi / 1000) * 1000)})에 하는 것이 적정해요${st.budget >= f.mid ? "" : ` · 예산 ${won(st.budget)}으로는 일부만`}</div>`; })() : "";
+      const lv = REC[c.id] || 0, fair = p.max > 0 && !c.blocked ? (() => { const f = fairOf(c); return `<div class="fair">이 방(${esc(rr.W + "×" + rr.D + "cm")})에는 우선순위 ${f.n}가지를 <b>약 ${won(Math.round(f.mid / 1000) * 1000)}</b>(${won(Math.round(f.lo / 1000) * 1000)}~${won(Math.round(f.hi / 1000) * 1000)})이 적정해요${f.n > 3 ? ` · 꼭 필요한 3가지만이면 약 ${won(Math.round(f.min3 / 1000) * 1000)}` : ""}${st.budget >= f.mid ? "" : ` · 예산 ${won(st.budget)}으로는 일부만`}</div>`; })() : "";
       return `<div class="cand${c.blocked ? " blocked" : ""}"><h3>${c.id}. ${esc(c.title)}${c.blocked ? '<span class="score">적용 불가</span>' : lv === 2 ? '<span class="rec rec2">매우 추천</span>' : lv === 1 ? '<span class="rec rec1">추천</span>' : ""}</h3>${fair}
         <div class="mut">${esc(c.cost)}</div>
         ${E.svg(r, c, { locked: [...st.locked] })}
@@ -613,6 +615,7 @@ function saveAndOpen(candId, layout, extra) {
   if (st.sampleId) { rec.sampleId = st.sampleId; rec.pins = JSON.parse(JSON.stringify((sampleOf(st.sampleId) || {}).pins || {})); }
   if (extra && extra.sampleId) { rec.sampleId = extra.sampleId; rec.pins = {}; }
   if (extra && extra.pins) rec.pins = extra.pins;
+  if (extra && extra.board) rec.board = extra.board;
   const all = loadQ(); all.unshift(rec); saveQ(all);
   if (!st.sampleId && st.photo && !savePhoto(rec.id, st.photo)) alert("사진 저장 공간이 부족해 사진 없이 저장했어요. 견적서 안에서 사진을 다시 추가할 수 있어요.");
   track("quote-saved"); openQuote(rec.id);
@@ -650,6 +653,8 @@ function photoPanel(rec, c, done) {
 }
 function renderQuote(rec) {
   const { r, opts, cs } = restore(rec), c = cs.find((x) => x.id === rec.candId), pref = getPref();
+  // 꾸미기 화면에서 고른 제품이 있으면 구매 리스트를 그에 맞춘다(없앤 제품은 빠지고, 더한 제품은 들어온다)
+  if (rec.board && rec.board.length) { c.items = rec.board.filter((k) => E.ITEM[k]); c.purchase = E.planPurchase(c.items, rec.st.budget); }
   const meta = { 집: `${E.HOUSING.find((h) => h.id === rec.st.housing).label}`, 방: E.TARGETS[rec.st.target].label, 크기: `${r.W}×${r.D}cm`,
     구조: `창 ${rec.st.view.windows.length ? rec.st.view.windows.map((w) => E.WALLS[w]).join("·") : "없음"} / 큰 가구 ${E.BIG_WALLS[rec.st.view.bigWall]} / 문 ${E.DOOR_POS[rec.st.view.door]}` };
   reg(c.purchase.inBudget.concat(c.purchase.over));
@@ -742,11 +747,11 @@ document.addEventListener("click", (e) => {
   if (bd && LAST) { const c = LAST.cs.find((x) => x.id === bd.dataset.board); if (c) {
     const ex = samplesFor(st.housing, st.target).find((x) => x.img), sm = st.sampleId ? sampleOf(st.sampleId) : null;
     const photo = st.photo || (ex && ex.img); if (!photo) { alert("사진이 없어요. 예시 방을 고르거나 내 방 사진을 올려주세요."); return; }
-    openBoard(c, photo, sm && sm.pins, (placed) => saveAndOpen(c.id, null, { pins: Object.fromEntries(placed.map((p) => [p.key, { x: Math.round(p.x), y: Math.round(p.y) }])), sampleId: st.photo ? null : ex && ex.id })); return; } }
+    openBoard(c, photo, sm && sm.pins, (placed) => saveAndOpen(c.id, null, { pins: Object.fromEntries(placed.map((p) => [p.key, { x: Math.round(p.x), y: Math.round(p.y) }])), sampleId: st.photo ? null : ex && ex.id, board: placed.map((p) => p.key) })); return; } }
   const qbd = e.target.closest("[data-qboard]");
   if (qbd) { const all = loadQ(), rec = all.find((q) => q.id === curQuoteId()); if (rec) { const { cs } = restore(rec), c = cs.find((x) => x.id === rec.candId), sm = rec.sampleId ? sampleOf(rec.sampleId) : null, photo = sm ? sm.img : photoOf(rec.id);
     if (!photo) { alert("사진이 없어요. 견적서에서 내 방 사진을 추가해주세요."); return; }
-    openBoard(c, photo, rec.pins, (placed) => { rec.pins = Object.fromEntries(placed.map((p) => [p.key, { x: Math.round(p.x), y: Math.round(p.y) }])); saveQ(all); renderQuote(rec); }); return; } }
+    openBoard(c, photo, rec.pins, (placed) => { rec.pins = Object.fromEntries(placed.map((p) => [p.key, { x: Math.round(p.x), y: Math.round(p.y) }])); rec.board = placed.map((p) => p.key); saveQ(all); renderQuote(rec); }, rec.board); return; } }
   const ed = e.target.closest("[data-edit]"); if (ed && LAST) { const c = LAST.cs.find((x) => x.id === ed.dataset.edit); if (c) Editor.open(c, LAST.r, (pcs) => saveAndOpen(c.id, pcs)); return; }
   const sv = e.target.closest("[data-save]"); if (sv) { saveAndOpen(sv.dataset.save); return; }
   if (e.target.closest("#closeQuote")) { $("#quote").hidden = true; $("#out").scrollIntoView({ behavior: "smooth" }); }
