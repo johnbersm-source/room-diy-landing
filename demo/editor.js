@@ -81,14 +81,8 @@
       : "";
     if (o.photo && o.pins)
       return `<div style="position:relative;line-height:0"><img src="${esc(o.photo)}" alt="" style="width:100%;border-radius:10px">${body}</div><p class="mut">사진 위에 구매 품목을 놓을 자리에 표시했어요(일러스트, 실제 제품·색은 다를 수 있어요).</p>`;
-    const dr = keys.map((k) => { const s = SLOT[k]; return s ? `<g transform="translate(${s[0] - s[2] / 2},${s[1] - s[2] / 2}) scale(${s[2] / 48})" style="color:var(--acc)">${ICON[k]}</g>` : ""; }).join("");
-    const base = o.family === "bed"
-      ? `<rect x="22" y="30" width="56" height="20" rx="3" fill="var(--card)" stroke="var(--fg)"/><rect x="22" y="22" width="56" height="9" rx="3" fill="var(--line)" stroke="var(--fg)"/>`
-      : `<rect x="20" y="34" width="60" height="16" rx="4" fill="var(--card)" stroke="var(--fg)"/><rect x="20" y="26" width="60" height="9" rx="4" fill="var(--line)" stroke="var(--fg)"/>`;
-    return `<svg viewBox="0 0 100 62" style="width:100%;border:1px solid var(--line);border-radius:10px;background:var(--card)" role="img" aria-label="구매 품목 적용 미리보기">
-      <rect x="0" y="0" width="100" height="44" fill="var(--bg)"/><rect x="0" y="52" width="100" height="10" fill="var(--line)" fill-opacity=".5"/>
-      <rect x="38" y="10" width="24" height="22" fill="none" stroke="var(--acc)" stroke-dasharray="2 2"/>${base}${dr}</svg>
-      <p class="mut">구매 품목 ${keys.length}개를 방에 놓은 모습의 그림이에요(일러스트, 실제 제품·크기와 달라요). 내 방 사진은 견적서에서 위치를 표시하면 사진 위에도 볼 수 있어요.</p>`;
+    // 사진이 없으면 도식 그림은 보여주지 않는다(실제 모습과 달라 오해를 준다). 사진 합성은 AI 이미지 연결 후 제공.
+    return `<div class="afterbox">적용 모습 · 준비 중<br>구매 품목 ${keys.length}개를 <b>내 방 사진에 올려 놓은 모습</b>은 AI 이미지 생성을 연결하면 이 자리에 나와요. 지금은 견적서에서 사진 위에 놓을 자리를 표시해 볼 수 있어요.</div>`;
   }
 
   /* ---------- 간결한 품목 줄 + 제외 항목 + 예산 올리기 ---------- */
