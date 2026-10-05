@@ -137,7 +137,7 @@ textarea{width:100%;font:12px/1.5 ui-monospace,monospace;background:var(--bg);co
       <input type="range" class="slider" id="areaRange" min="0" max="6" step="1" value="0" aria-label="평형 선택">
       <div class="ticks"><span id="tickMin"></span><span id="tickMax"></span></div>
       <p class="info unset" id="areaInfo"></p></div>
-    <div class="grp" id="structBox" hidden><h3 class="gt">준공 시기</h3><div class="segs c3" id="eras"></div><h3 class="gt" style="margin-top:12px">우리 집 구조</h3><div class="segs c2" id="structs"></div><p class="mut" id="structDesc"></p></div>
+    <div class="grp" id="structBox" hidden><h3 class="gt">준공 시기</h3><div class="segs c3" id="eras"></div><h3 class="gt" style="margin-top:12px">방 개수</h3><div class="segs c3" id="roomsSel"></div><h3 class="gt" style="margin-top:12px">화장실 개수</h3><div class="segs c3" id="bathsSel"></div><p class="mut" id="planDesc"></p><h3 class="gt" style="margin-top:12px">우리 집 구조</h3><div class="segs c2" id="structs"></div><p class="mut" id="structDesc"></p></div>
     <div class="grp"><h3 class="gt">방 모양</h3><div class="segs c2" id="shapes"></div></div>
     <details style="margin-top:12px"><summary>줄자로 방 크기를 직접 입력하기 (선택)</summary>
       <div class="row">가로 <input id="w" type="number" min="200" max="700" step="10"> cm
@@ -194,9 +194,9 @@ textarea{width:100%;font:12px/1.5 ui-monospace,monospace;background:var(--bg);co
   <section id="quote" hidden></section>
   <p class="mut" style="margin-top:24px">AI 이미지는 참고용이며 실제와 다를 수 있습니다. 가구 치수·간격·가격은 일반 가정값이며 실측과 판매처 가격으로 확인하세요. 상품 링크는 각 쇼핑몰의 검색 링크로, 제휴 승인 전이라 수수료가 없는 임시 링크입니다. 제휴가 시작되면 화면 상단과 견적서에 대가성 문구를 표시합니다.</p>
 </main>
-<script src="layout.js"></script>
-<script src="samples.js"></script>
-<script src="editor.js"></script>
+<script src="layout.js?v=1791187946"></script>
+<script src="samples.js?v=1791187946"></script>
+<script src="editor.js?v=1791187946"></script>
 <script src="samples.local.js" onerror="this.remove()"></script>
 <script>
 // 방문·이용 측정(기본 꺼짐). 쿠키 없이 세는 서비스(예: GoatCounter)의 주소를 넣으면 켜집니다.
@@ -213,14 +213,22 @@ const BUDGETS = [5, 15, 30, 50, 100];
 
 const st = { chosen: { housing: false, area: false, budget: false }, housing: "apt", target: "living", area: "apt59", shape: "std", sizes: E.suggestSizes(E.roomFor("apt", "apt59", "living"), "living"), touched: false,
   view: JSON.parse(JSON.stringify(E.DEFAULT_VIEW)), door: "sliding",
-  locked: new Set(), photoMode: "sample", sampleId: null, photo: null, struct: "unknown", era: "unknown", rental: false, budget: 150000, customBudget: false, custom: null };
+  locked: new Set(), photoMode: "sample", sampleId: null, photo: null, struct: "unknown", era: "unknown", rooms: 3, baths: 2, planTouched: false, rental: false, budget: 150000, customBudget: false, custom: null };
 function renumber() { let n = 1; document.querySelectorAll("main h2[data-n]").forEach((h) => { if (h.closest("[hidden]")) return; h.textContent = `${n++}. ${h.dataset.n}`; }); }
 function renderAdvSummary() {
   const v = st.view, O = E.SIZE_OPTIONS, parts = [`창 ${v.windows.length ? v.windows.map((w) => E.WALLS[w]).join("·") : "없음"}`, `큰 가구 ${E.BIG_WALLS[v.bigWall]}`, `문 ${E.DOOR_POS[v.door]}`];
   $("#advSummary").innerHTML = `우리 집과 다르면 바꾸기 (선택)<br><span class="mut">지금 가정: ${esc(parts.join(" · "))}${st.locked.size ? ` · 이동 불가 ${st.locked.size}개` : ""}</span>`;
 }
 const H = () => E.HOUSING.find((x) => x.id === st.housing);
-const room = () => st.custom || E.roomFor(st.housing, st.area, st.target, st.shape, st.era);
+const planOf = () => st.housing === "apt" ? { rooms: st.rooms, baths: st.baths } : null;
+// 평형·준공 시기를 바꾸면(직접 고른 적이 없을 때) 그 평형의 일반적인 방·화장실 개수로 맞춘다.
+function syncPlan() {
+  if (st.housing !== "apt") return;
+  const a = H().areas.find((x) => x.id === st.area);
+  if (a && !st.planTouched) { const d = E.aptPlanDefault(a.sqm, st.era); st.rooms = d.rooms; st.baths = d.baths; }
+  if (st.rooms < 2 && st.target === "small") st.target = "master";
+}
+const room = () => st.custom || E.roomFor(st.housing, st.area, st.target, st.shape, st.era, planOf());
 const living = () => st.target === "living";
 const engineOpts = (extra) => Object.assign({ housing: st.housing, target: st.target, sizes: st.sizes, view: st.view, door: st.door, locked: [...st.locked] }, extra || {});
 function resetSizes() { st.sizes = E.suggestSizes(room(), st.target); st.touched = false; }
@@ -279,7 +287,7 @@ function renderHousing() {
 function renderTarget() {
   const h = H();
   $("#targetBox").hidden = h.targets.length < 2;
-  $("#target").innerHTML = h.targets.map((t) => segBtn("target", t, E.TARGETS[t].label, t === st.target)).join("");
+  $("#target").innerHTML = h.targets.filter((t) => !(h.id === "apt" && t === "small" && st.rooms < 2)).map((t) => segBtn("target", t, E.TARGETS[t].label, t === st.target)).join("");
   $("#targetDesc").textContent = E.TARGETS[st.target].desc;
 }
 function structSvg(sx) {
@@ -290,7 +298,10 @@ function structSvg(sx) {
 }
 function renderStructs() {
   $("#structBox").hidden = st.housing !== "apt";
-  $("#eras").innerHTML = E.APT_ERAS.map((x) => segBtn("era", x.id, x.label, st.era === x.id)).join("");
+  $("#roomsSel").innerHTML = [1, 2, 3, 4, 5].map((n) => segBtn("rooms", n, n + "개", st.rooms === n)).join("");
+  $("#bathsSel").innerHTML = [1, 2, 3].map((n) => segBtn("baths", n, n + "개", st.baths === n)).join("");
+  $("#planDesc").textContent = st.planTouched ? "직접 고른 구성으로 거실·안방·작은방 크기를 다시 계산했어요." : "고른 평형의 일반적인 구성이에요. 우리 집과 다르면 바꿔주세요. 방이 많을수록 각 방이 작아져요(가정값).";
+  $("#eras").innerHTML = (E.APT_ERAS || []).map((x) => segBtn("era", x.id, x.label, st.era === x.id)).join("");
   $("#structs").innerHTML = E.APT_STRUCTURES.map((sx) => segBtn("struct", sx.id, sx.label, st.struct === sx.id)).join("");
   const cur = E.APT_STRUCTURES.find((x) => x.id === st.struct); $("#structDesc").textContent = cur ? cur.desc : "";
 }
@@ -383,7 +394,7 @@ function applySample(x) {
   st.housing = p.housing; st.target = p.target; st.area = p.area; st.shape = p.shape || "std"; st.custom = null; st.locked.clear();
   st.view = JSON.parse(JSON.stringify(Object.assign({}, E.DEFAULT_VIEW, p.view || {}))); st.door = p.door || "sliding";
   st.sizes = Object.assign({}, E.suggestSizes(room(), st.target), p.sizes || {}); st.touched = true;
-  st.chosen.housing = true; st.chosen.area = true;
+  st.chosen.housing = true; st.chosen.area = true; st.planTouched = false; st.era = "unknown"; syncPlan();
   st.photoMode = "sample"; st.sampleId = x.id; st.photo = x.img || null;
 }
 function missing() { const m = []; if (!st.chosen.housing) m.push(["집 종류", "#gHousing"]); if (!st.chosen.area) m.push(["평형", "#gArea"]); if (!st.chosen.budget || !(st.budget > 0)) m.push(["예산", "#gBudget"]); return m; }
@@ -403,11 +414,12 @@ document.addEventListener("click", (e) => {
   if (c) {
     const g = c.dataset.g, v = c.dataset.v, O = E.SIZE_OPTIONS;
     let touchSize = false;
-    if (g === "housing") { st.chosen.housing = true; st.chosen.area = false; st.struct = "unknown"; st.era = "unknown"; st.housing = v; const h = H(); st.target = h.targets[0]; st.area = h.areas[Math.min(3, h.areas.length - 1)].id; st.custom = null; st.locked.clear(); resetSizes(); }
+    if (g === "housing") { st.chosen.housing = true; st.chosen.area = false; st.struct = "unknown"; st.era = "unknown"; st.planTouched = false; st.housing = v; const h = H(); st.target = h.targets[0]; st.area = h.areas[Math.min(3, h.areas.length - 1)].id; st.custom = null; st.locked.clear(); syncPlan(); resetSizes(); }
     else if (g === "target") { st.target = v; st.custom = null; st.locked.clear(); resetSizes(); }
-    else if (g === "area") { st.area = v; st.custom = null; if (!st.touched) resetSizes(); }
+    else if (g === "area") { st.area = v; st.custom = null; syncPlan(); if (!st.touched) resetSizes(); }
     else if (g === "shape") { st.shape = v; st.custom = null; if (!st.touched) resetSizes(); }
-    else if (g === "era") { st.era = v; st.custom = null; if (!st.touched) resetSizes(); }
+    else if (g === "era") { st.era = v; st.custom = null; syncPlan(); if (!st.touched) resetSizes(); }
+    else if (g === "rooms" || g === "baths") { st[g] = Number(v); st.planTouched = true; st.custom = null; syncPlan(); if (!st.touched) resetSizes(); }
     else if (g === "struct") { const sx = E.APT_STRUCTURES.find((x) => x.id === v); st.struct = v; st.shape = sx.shape; st.view.windows = [...sx.windows]; st.view.winSize = sx.winSize; st.custom = null; if (!st.touched) resetSizes(); track("struct-" + v); }
     else if (g === "win") { const i = st.view.windows.indexOf(v); i >= 0 ? st.view.windows.splice(i, 1) : st.view.windows.push(v); }
     else if (g === "big") st.view.bigWall = v;
@@ -452,7 +464,7 @@ function shot() {
   const img = $("#preview"); img.src = st.photo; img.hidden = false; closeCam(); track("own-photo-camera");
 }
 const onArea = (e) => { const h = H(), i = Number($("#areaRange").value), a = h.areas[i]; if (!a) return;
-  st.chosen.area = true; st.area = a.id; st.custom = null; if (!st.touched) resetSizes();
+  st.chosen.area = true; st.area = a.id; st.custom = null; syncPlan(); if (!st.touched) resetSizes();
   renderAreaInfo(); renderAdvSummary(); renderBasicsSummary(); renderLock(); renderFurn(); updateBar(); $("#out").innerHTML = ""; $("#quote").hidden = true; };
 $("#areaRange").addEventListener("input", onArea); $("#areaRange").addEventListener("pointerdown", () => setTimeout(onArea, 0)); $("#areaRange").addEventListener("keydown", () => setTimeout(onArea, 0));
 $("#baRange").addEventListener("input", (e) => { const v = Number(e.target.value); $("#baBefore").style.clipPath = `inset(0 ${100 - v}% 0 0)`; $("#baLine").style.left = v + "%"; });
@@ -539,9 +551,9 @@ const saveQ = (a) => { try { localStorage.setItem(QKEY, JSON.stringify(a)); retu
 const photoOf = (id) => { try { return localStorage.getItem("diy_photo_" + id); } catch (e) { return null; } };
 const savePhoto = (id, data) => { try { localStorage.setItem("diy_photo_" + id, data); return true; } catch (e) { return false; } };
 const snapshot = () => ({ housing: st.housing, target: st.target, area: st.area, shape: st.shape, custom: st.custom, sizes: st.sizes, view: st.view,
-  door: st.door, locked: [...st.locked], era: st.era, rental: st.rental, budget: st.budget });
+  door: st.door, locked: [...st.locked], era: st.era, rooms: st.rooms, baths: st.baths, rental: st.rental, budget: st.budget });
 function restore(rec) {
-  const s = rec.st, r = s.custom || E.roomFor(s.housing, s.area, s.target, s.shape, s.era);
+  const s = rec.st, r = s.custom || E.roomFor(s.housing, s.area, s.target, s.shape, s.era, s.rooms ? { rooms: s.rooms, baths: s.baths } : null);
   const opts = { housing: s.housing, target: s.target, sizes: s.sizes, view: s.view, door: s.door, locked: s.locked, budget: s.budget, rental: s.rental };
   return { r, opts, cs: E.candidates(r, opts) };
 }

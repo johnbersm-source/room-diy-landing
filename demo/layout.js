@@ -21,10 +21,13 @@
    *   (커뮤니티 글 기반 가정) 를 기준으로 면적 비의 제곱근으로 줄이고 늘린다. */
   // 공급평형 표기: 조사 자료의 대응(전용 59→24~25평형, 74→30, 84→32~34, 101→40, 114→43~46, 135→50평형대, 소형 19→9, 33→15, 45→20)은 그대로,
   // 그 사이 전용면적은 전용률 약 72%로 환산한 **근사값(약)** 이다.
-  const APT_LABELS = { 20: "9평형", 39: "18평형", 33: "15평형", 45: "20평형", 59: "24~25평형", 74: "30평형", 84: "32~34평형", 101: "40평형", 114: "43~46평형", 135: "50평형대" };
+  const APT_LABELS = { 20: "9평형", 39: "약 17평형", 33: "15평형", 45: "18~20평형", 59: "24~25평형", 74: "30평형", 84: "32~34평형", 101: "40평형", 114: "43~46평형", 135: "50평형대" };
   const aptLabel = (sqm) => APT_LABELS[sqm] || `약 ${Math.round(sqm / 0.72 / PYEONG)}평형`;
   // 방 개수(침실 기준) [구축, 신축]: 일반적 경향에 대한 가정값(확인된 통계 아님). 신축은 같은 평형에서 방이 더 많이 나뉘는 편.
   const APT_ROOMS = { 20: [1, 1], 26: [1, 1], 33: [2, 2], 39: [2, 2], 45: [2, 3], 51: [3, 3], 59: [3, 3], 69: [3, 3], 74: [3, 4], 84: [3, 4], 101: [4, 4], 114: [4, 5], 135: [4, 5] };
+  // 방·욕실 기본값: 검색으로 확인한 일반 경향(59㎡ 미만은 대부분 방 2·욕실 1, 84㎡는 방 3·욕실 2, 최근엔 소형에도 방 3·욕실 2 신축 등장).
+  // 같은 면적에서 방이 많을수록 각 방이 작아진다는 보정(방 1개 추가당 거실 -6%, 침실 -5%)과 욕실 2개 이상일 때 안방 -4%는 **가정값**이다.
+  const aptPlanDefault = (sqm, era) => ({ rooms: (APT_ROOMS[sqm] || [2, 3])[era === "old" ? 0 : 1], baths: sqm < 55 ? 1 : sqm < 95 ? 2 : 3 });
   const A = (sqm, desc) => ({ sqm, label: aptLabel(sqm), desc, rooms: APT_ROOMS[sqm] });
   // 준공 시기: 구축은 거실이 작고 방이 크게 나뉘는 편, 신축은 거실·주방이 넓은 편(가정값).
   const APT_ERAS = [
@@ -71,7 +74,7 @@
   ];
   const SHAPE_RATIO = { sq: 1.0, wide: 1.25, long: 0.62 }; // 가로/세로. std는 기준점 비율
 
-  function roomFor(housingId, areaId, target, shape, era) {
+  function roomFor(housingId, areaId, target, shape, era, plan) {
     const h = HOUSING.find((x) => x.id === housingId);
     const a = h.areas.find((x) => x.id === areaId);
     const t = TARGETS[target] ? target : h.targets[0];
@@ -84,7 +87,13 @@
       const f = Math.sqrt(a.sqm / 74);
       const [aw, ad] = TARGETS[t].anchor;
       const ef = t === "living" && housingId === "apt" ? ((APT_ERAS.find((x) => x.id === era) || {}).living || 1) : 1;
-      W = aw * f * ef; D = ad * f * ef;
+      let pf = 1;
+      if (housingId === "apt" && plan && plan.rooms) {
+        const d = aptPlanDefault(a.sqm, era), dr = plan.rooms - d.rooms;
+        pf = Math.max(0.8, Math.min(1.15, 1 - (t === "living" ? 0.06 : 0.05) * dr));
+        if (t === "master" && plan.baths >= 2) pf *= 0.96;
+      }
+      W = aw * f * ef * Math.sqrt(pf); D = ad * f * ef * Math.sqrt(pf);
       if (shape && shape !== "std") {
         const area = W * D, ratio = SHAPE_RATIO[shape];
         W = Math.sqrt(area * ratio); D = area / W;
@@ -665,7 +674,7 @@
     return o + "</svg>";
   }
 
-  const api = { PAD, ROOM_SHRINK, PYEONG, HOUSING, APT_STRUCTURES, APT_ERAS, TARGETS, SHAPES, SIZE_OPTIONS, DEFAULT_SIZES, TARGET_DEFAULTS,
+  const api = { PAD, ROOM_SHRINK, PYEONG, HOUSING, APT_STRUCTURES, APT_ERAS, aptPlanDefault, TARGETS, SHAPES, SIZE_OPTIONS, DEFAULT_SIZES, TARGET_DEFAULTS,
     WALLS, BIG_WALLS, DOOR_POS, DEFAULT_VIEW, MERCHANTS, FIXED_PROMPT, ITEM,
     WIN_SIZES, OBSTACLES, CORNERS, roomFor, suggestSizes, candidates, currentScene, anyApplicable, suggestions, buildQuote, svg, score, planPurchase, usableRoom };
   if (typeof module !== "undefined" && module.exports) module.exports = api;
