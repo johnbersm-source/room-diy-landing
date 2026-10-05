@@ -46,7 +46,7 @@
     let m = document.getElementById("itemModal");
     if (!m) {
       m = document.createElement("div"); m.id = "itemModal";
-      m.style.cssText = "position:fixed;inset:0;background:rgba(0,0,0,.45);z-index:50;display:none;align-items:flex-end;justify-content:center";
+      m.style.cssText = "position:fixed;inset:0;background:rgba(0,0,0,.45);z-index:50;display:none;align-items:flex-end;justify-content:center;user-select:none;-webkit-user-select:none";
       m.addEventListener("click", (e) => { if (e.target === m || e.target.closest("[data-closemodal]")) m.style.display = "none"; });
       document.body.appendChild(m);
     }
@@ -152,12 +152,14 @@
       const rg = (cand.regions || []).map((r) => `<rect x="${M + px(r.rect.x)}" y="${M + px(r.rect.y)}" width="${px(r.rect.w)}" height="${px(r.rect.h)}" fill="none" stroke="var(--acc)" stroke-dasharray="3 3" pointer-events="none"/>`).join("");
       document.getElementById("edSvg").innerHTML = `<rect x="${M}" y="${M}" width="${px(U.W)}" height="${px(U.D)}" fill="none" stroke="var(--fg)" stroke-width="2"/>${rg}${g}`;
       document.getElementById("edChk").innerHTML = checks(P, U, cand.regions).map((k) => `<li class="${k.level}">${esc(k.msg)}</li>`).join("");
+      document.getElementById("edPlaced").innerHTML = P.map((p, i) => p.kind === "fixed" ? "" : `<button type="button" data-rmp="${i}" aria-pressed="${i === sel}">${esc(p.label)} ✕</button>`).join("");
       document.getElementById("edSel").textContent = sel >= 0 ? `선택: ${P[sel].label} (${P[sel].w}×${P[sel].h}cm)` : "가구를 끌어서 옮기고, 눌러서 선택하세요";
     }
     m.innerHTML = `<div style="background:var(--bg);color:var(--fg);width:100%;max-width:560px;max-height:94vh;overflow:auto;border-radius:16px 16px 0 0;padding:14px;user-select:none;-webkit-user-select:none">
       <h3 style="margin:0 0 6px">끌어서 직접 배치 <span class="mut">(${esc(cand.id)}안에서 시작)</span></h3>
       <svg id="edSvg" viewBox="0 0 ${vw} ${vh}" style="width:100%;touch-action:none;user-select:none;-webkit-user-select:none;background:var(--card);border-radius:10px"></svg>
       <p class="mut" id="edSel"></p>
+      <div class="mut">놓은 가구 <span style="font-size:12px">(✕를 누르면 지워요)</span></div><div class="row seg" id="edPlaced"></div>
       <div class="row seg"><button type="button" data-ed="rot">회전</button><button type="button" data-ed="del">삭제</button><button type="button" data-ed="reset">처음으로</button></div>
       <div class="mut" style="margin-top:6px">추가</div><div class="row seg" id="edPal">${PALETTE.map((p, i) => `<button type="button" data-add="${i}">+ ${p[0]}</button>`).join("")}</div>
       <ul class="chk" id="edChk"></ul>
@@ -180,6 +182,7 @@
     const end = () => { drag = null; }; svgEl.addEventListener("pointerup", end); svgEl.addEventListener("pointercancel", end);
     m.onclick = (e) => {
       if (e.target === m || e.target.closest("[data-closemodal]")) { m.style.display = "none"; m.onclick = null; return; }
+      const rp = e.target.closest("[data-rmp]"); if (rp) { P.splice(Number(rp.dataset.rmp), 1); sel = -1; draw(); return; }
       const a = e.target.closest("[data-add]");
       if (a) { const [label, w, h, kind] = PALETTE[Number(a.dataset.add)]; n++; P.push({ id: "u" + n, label, x: snap((U.W - w) / 2), y: snap((U.D - h) / 2), w, h, kind }); sel = P.length - 1; draw(); return; }
       const b = e.target.closest("[data-ed]"); if (!b) return; const k = b.dataset.ed;

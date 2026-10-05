@@ -195,9 +195,10 @@ textarea{width:100%;font:12px/1.5 ui-monospace,monospace;background:var(--bg);co
   <section id="quote" hidden></section>
   <p class="mut" style="margin-top:24px">AI 이미지는 참고용이며 실제와 다를 수 있습니다. 가구 치수·간격·가격은 일반 가정값이며 실측과 판매처 가격으로 확인하세요. 상품 링크는 각 쇼핑몰의 검색 링크로, 제휴 승인 전이라 수수료가 없는 임시 링크입니다. 제휴가 시작되면 화면 상단과 견적서에 대가성 문구를 표시합니다.</p>
 </main>
-<script src="layout.js?v=1791211558"></script>
-<script src="samples.js?v=1791211558"></script>
-<script src="editor.js?v=1791211558"></script>
+<script src="layout.js?v=1791212447"></script>
+<script src="samples.js?v=1791212447"></script>
+<script src="editor.js?v=1791212447"></script>
+<script src="board.js?v=1791212447"></script>
 <script src="samples.local.js" onerror="this.remove()"></script>
 <script>
 // 방문·이용 측정(기본 꺼짐). 쿠키 없이 세는 서비스(예: GoatCounter)의 주소를 넣으면 켜집니다.
@@ -502,6 +503,18 @@ fetch("prices.json").then((r) => r.ok ? r.json() : null).then((d) => { if (!d ||
 const COMPOSE_URL = "https://room-compose.eyewear-fit.workers.dev";
 function whereOf(pin) { if (!pin) return "natural spot"; return `${pin.y < 40 ? "upper" : pin.y > 65 ? "lower" : "middle"} ${pin.x < 35 ? "left" : pin.x > 65 ? "right" : "center"}`; }
 function resizeBlob(src, max) { return new Promise((res, rej) => { const im = new Image(); im.crossOrigin = "anonymous"; im.onload = () => { const c = document.createElement("canvas"); c.width = c.height = max; c.getContext("2d").drawImage(im, 0, 0, max, max); /* 모델이 정사각형으로 출력하므로 늘려서 보내고, 결과는 원래 비율로 되돌려 보여준다 */ c.toBlob((b) => b ? res({ b, w: im.width, h: im.height }) : rej(new Error("blob")), "image/jpeg", 0.85); }; im.onerror = () => rej(new Error("img")); im.src = src; }); }
+const itemNames = () => Object.fromEntries(Object.entries(E.ITEM).map(([k, v]) => [k, { name: v.name, price: v.price }]));
+async function composeBoard(photoSrc, placed) {
+  const form = new FormData(), pr = await resizeBlob(photoSrc, 768); form.append("photo", pr.b, "room.jpg"); form.append("width", 768); form.append("height", 768);
+  form.append("items", JSON.stringify(placed.slice(0, 8).map((p) => ({ name: E.ITEM[p.key].name, size: E.ITEM[p.key].size, where: whereOf({ x: p.x, y: p.y }) }))));
+  const r = await fetch(COMPOSE_URL, { method: "POST", body: form }), d = await r.json();
+  if (!d.image) throw new Error(d.error || "생성에 실패했어요.");
+  track("compose-ok"); return "data:image/jpeg;base64," + d.image;
+}
+function openBoard(c, photoSrc, pins, onSave) {
+  Board.open({ photo: photoSrc, names: itemNames(), items: c.purchase.inBudget.map((i) => i.key).filter((k) => Board.SLOT[k]), pins: pins || {}, onSave,
+    compose: COMPOSE_URL ? (placed) => composeBoard(photoSrc, placed) : null });
+}
 async function composeNow(rec, c, photoSrc) {
   const box = $("#composeOut"); box.innerHTML = '<p class="mut">AI가 사진에 적용하는 중이에요(약 10~30초)…</p>';
   try {
@@ -556,7 +569,7 @@ $("#go").addEventListener("click", () => {
         ${E.svg(r, c, { locked: [...st.locked] })}
         <ul class="chk">${c.checks.map((k) => `<li class="${k.level}">${esc(k.msg)}</li>`).join("")}</ul>
         ${c.blocked ? `<button class="cta ghost" type="button" data-unlock="${esc((c.blockedBy || []).join(","))}">${esc((c.blockedBy || []).map((id) => names[id] || id).join(", "))} 이동 불가를 해제하고 다시 보기</button>` : buy}
-        ${c.blocked ? "" : `<button class="cta ghost" type="button" data-edit="${c.id}">끌어서 직접 배치해보기</button><button class="cta ghost" type="button" data-save="${c.id}">견적서 받기 (앱에 보관)</button>`}
+        ${c.blocked ? "" : `<button class="cta" type="button" data-board="${c.id}">사진 위에 끌어서 꾸며보기</button><button class="cta ghost" type="button" data-edit="${c.id}">도면에서 가구 배치해보기</button><button class="cta ghost" type="button" data-save="${c.id}">견적서 받기 (앱에 보관)</button>`}
         <details><summary>AI 이미지에 넣을 지시문</summary><textarea readonly rows="6">${esc(c.prompt)}</textarea></details></div>`;
     }).join("");
   $("#quote").hidden = true;
@@ -581,11 +594,13 @@ function renderMyQuotes() {
   $("#myQuotes").innerHTML = all.length ? `<h2>내 견적서 (앱에 보관돼요)</h2>` + all.map((q) =>
     `<div class="myq"><span>${esc(q.id)} · ${esc(q.title)} · ${q.views}번 열람</span><button type="button" data-open="${esc(q.id)}">열기</button></div>`).join("") : "";
 }
-function saveAndOpen(candId, layout) {
+function saveAndOpen(candId, layout, extra) {
   const c = LAST.cs.find((x) => x.id === candId);
   const rec = { id: E.buildQuote(c, {}).id, created: Date.now(), title: `${H().label} ${E.TARGETS[st.target].label} · ${c.id}.${c.title}`, candId, st: JSON.parse(JSON.stringify(snapshot())), views: 0, checked: [], clicks: {}, pins: {} };
   if (layout) rec.layout = layout;
   if (st.sampleId) { rec.sampleId = st.sampleId; rec.pins = JSON.parse(JSON.stringify((sampleOf(st.sampleId) || {}).pins || {})); }
+  if (extra && extra.sampleId) { rec.sampleId = extra.sampleId; rec.pins = {}; }
+  if (extra && extra.pins) rec.pins = extra.pins;
   const all = loadQ(); all.unshift(rec); saveQ(all);
   if (!st.sampleId && st.photo && !savePhoto(rec.id, st.photo)) alert("사진 저장 공간이 부족해 사진 없이 저장했어요. 견적서 안에서 사진을 다시 추가할 수 있어요.");
   track("quote-saved"); openQuote(rec.id);
@@ -652,7 +667,7 @@ function renderQuote(rec) {
     <h3>진행 상황 <span class="mut">${done.size}/${total}개 준비</span></h3><div class="bar"><i style="width:${total ? Math.round(done.size / total * 100) : 0}%"></i></div>
     <table>${Object.entries(meta).map(([k, v]) => `<tr><th>${esc(k)}</th><td colspan="2">${esc(v)}</td></tr>`).join("")}<tr><th>추천 안</th><td colspan="2">${esc(q.plan)} (${esc(q.cost)})</td></tr></table>
     <h3>내 방 사진에서 보는 진행 상황</h3>${photoPanel(rec, c, done)}
-    <h3>구매 품목을 적용한 모습</h3>${COMPOSE_URL && ph0 ? `<button class="cta ghost" type="button" data-compose="1">AI로 내 방에 적용해 보기 (무료 체험)</button><div id="composeOut"></div>` : ""}${Editor.preview(c.purchase.inBudget, { family: c.family, photo: ph0, pins: rec.pins && Object.keys(rec.pins).length ? rec.pins : null })}
+    <h3>구매 품목을 적용한 모습</h3>${ph0 ? `<button class="cta" type="button" data-qboard="1">사진 위에 끌어서 꾸며보기</button>` : ""}${COMPOSE_URL && ph0 ? `<button class="cta ghost" type="button" data-compose="1">AI로 내 방에 적용해 보기 (무료 체험)</button><div id="composeOut"></div>` : ""}${Editor.preview(c.purchase.inBudget, { family: c.family, photo: ph0, pins: rec.pins && Object.keys(rec.pins).length ? rec.pins : null })}
     <details><summary>${rec.layout ? "내가 직접 배치한 도면" : "참고 배치도(도면 보기)"}</summary>${E.svg(r, rec.layout ? Object.assign({}, c, { pieces: rec.layout }) : c, { locked: rec.st.locked })}</details>
     <h3>이렇게 바꿔요</h3><ol>${q.changes.map((x) => `<li>${esc(x)}</li>`).join("")}</ol>
     ${q.phases.length ? q.phases.map((p) => `<h3>${esc(p.title)} <span class="mut">소계 약 ${won(p.subtotal)}</span></h3>
@@ -711,6 +726,15 @@ document.addEventListener("click", (e) => {
   if (e.target.closest("[data-compose]")) { const rec = loadQ().find((q) => q.id === curQuoteId()); if (rec) { const { cs } = restore(rec), c = cs.find((x) => x.id === rec.candId), sm = rec.sampleId ? sampleOf(rec.sampleId) : null; composeNow(rec, c, sm ? sm.img : photoOf(rec.id)); } return; }
   const vw = e.target.closest("[data-view]"); if (vw && REG[vw.dataset.view]) { Editor.showItem(REG[vw.dataset.view]); return; }
   const rz = e.target.closest("[data-raise]"); if (rz) { st.budget = Number(rz.dataset.raise); st.customBudget = !BUDGETS.includes(st.budget / 10000); st.chosen.budget = true; renderBudget(); track("budget-raised"); $("#go").click(); return; }
+  const bd = e.target.closest("[data-board]");
+  if (bd && LAST) { const c = LAST.cs.find((x) => x.id === bd.dataset.board); if (c) {
+    const ex = samplesFor(st.housing, st.target).find((x) => x.img), sm = st.sampleId ? sampleOf(st.sampleId) : null;
+    const photo = st.photo || (ex && ex.img); if (!photo) { alert("사진이 없어요. 예시 방을 고르거나 내 방 사진을 올려주세요."); return; }
+    openBoard(c, photo, sm && sm.pins, (placed) => saveAndOpen(c.id, null, { pins: Object.fromEntries(placed.map((p) => [p.key, { x: Math.round(p.x), y: Math.round(p.y) }])), sampleId: st.photo ? null : ex && ex.id })); return; } }
+  const qbd = e.target.closest("[data-qboard]");
+  if (qbd) { const all = loadQ(), rec = all.find((q) => q.id === curQuoteId()); if (rec) { const { cs } = restore(rec), c = cs.find((x) => x.id === rec.candId), sm = rec.sampleId ? sampleOf(rec.sampleId) : null, photo = sm ? sm.img : photoOf(rec.id);
+    if (!photo) { alert("사진이 없어요. 견적서에서 내 방 사진을 추가해주세요."); return; }
+    openBoard(c, photo, rec.pins, (placed) => { rec.pins = Object.fromEntries(placed.map((p) => [p.key, { x: Math.round(p.x), y: Math.round(p.y) }])); saveQ(all); renderQuote(rec); }); return; } }
   const ed = e.target.closest("[data-edit]"); if (ed && LAST) { const c = LAST.cs.find((x) => x.id === ed.dataset.edit); if (c) Editor.open(c, LAST.r, (pcs) => saveAndOpen(c.id, pcs)); return; }
   const sv = e.target.closest("[data-save]"); if (sv) { saveAndOpen(sv.dataset.save); return; }
   if (e.target.closest("#closeQuote")) { $("#quote").hidden = true; $("#out").scrollIntoView({ behavior: "smooth" }); }
