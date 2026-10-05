@@ -95,9 +95,9 @@
   function row(it, over) {
     return `<div class="item${over ? " over" : ""}" style="display:flex;gap:10px;align-items:center;padding:8px 0">
       <button type="button" data-view="${esc(it.key)}" aria-label="${esc(it.name)} 제품 보기" style="border:1px solid var(--line);border-radius:10px;background:var(--card);padding:4px;line-height:0;flex:none">${icon(it.key, 40)}</button>
-      <div style="flex:1;min-width:0"><b>${esc(it.name)}</b>${it.tag ? ` <span class="tag" style="color:var(--acc)">${esc(it.tag)}</span>` : ""}
+      <div style="flex:1;min-width:0;word-break:keep-all"><b>${esc(it.name)}</b>${it.tag ? ` <span class="tag" style="color:var(--acc)">${esc(it.tag)}</span>` : ""}
         <div class="meta">${won(it.price[0])}~${won(it.price[1])}${TREND[it.key] ? ` · ${esc(TREND[it.key])}` : ""}</div></div>
-      <button type="button" class="cta2" data-view="${esc(it.key)}" style="flex:none">보기</button></div>`;
+      <button type="button" class="cta2" data-view="${esc(it.key)}" style="width:auto;display:inline-block;margin:0;padding:8px 14px;font-size:13px;border:0;cursor:pointer;flex:none;white-space:nowrap">보기</button></div>`;
   }
   // 예산을 올리면 추가할 수 있는 것: 제외 품목을 싼 순으로 단계별 누적(최저가 기준)
   function ladder(purchase, budget) {
@@ -114,7 +114,7 @@
     if (!purchase.over.length) return "";
     const g = ladder(purchase, budget);
     return `<div class="sug"><b>예산을 올리면 이런 것도 더할 수 있어요</b>
-      ${g.map((x) => `<div style="display:flex;justify-content:space-between;gap:8px;align-items:center;padding:4px 0"><span>${x.names.map(esc).join(" · ")}</span><button type="button" class="cta2" ${attr}="${x.need}">${x.need / 10000}만원으로</button></div>`).join("")}
+      ${g.map((x) => `<div style="display:flex;justify-content:space-between;gap:8px;align-items:center;padding:4px 0"><span>${x.names.map(esc).join(" · ")}</span><button type="button" class="cta2" style="width:auto;display:inline-block;margin:0;padding:8px 14px;font-size:13px;border:0;cursor:pointer;flex:none;white-space:nowrap" ${attr}="${x.need}">${x.need / 10000}만원으로</button></div>`).join("")}
       <p class="mut">필요 예산은 각 품목의 중간 예상가를 더한 값이에요. 꼭 늘릴 필요는 없어요.</p></div>`;
   }
 
