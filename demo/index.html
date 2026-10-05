@@ -58,6 +58,7 @@ textarea{width:100%;font:12px/1.5 ui-monospace,monospace;background:var(--bg);co
 .photobox{position:relative;display:block;max-width:100%;margin:8px 0}.photobox img{width:100%;border-radius:10px;display:block;cursor:crosshair}
 .pin{position:absolute;transform:translate(-50%,-50%);width:26px;height:26px;border-radius:50%;background:var(--bg);border:2px solid var(--acc);color:var(--acc);font-size:12px;font-weight:700;display:flex;align-items:center;justify-content:center;pointer-events:none}
 .pin.done{background:var(--acc);color:#fff}
+.thumbfb svg{width:100%;height:84px}.thumbfb text{display:none}
 .afterbox{border:2px dashed var(--line);border-radius:10px;padding:14px;text-align:center;color:var(--mut);font-size:13px;margin:8px 0}
 [hidden]{display:none!important}
 #camBox{position:fixed;inset:0;background:#000;z-index:50;display:flex;flex-direction:column}
@@ -194,9 +195,9 @@ textarea{width:100%;font:12px/1.5 ui-monospace,monospace;background:var(--bg);co
   <section id="quote" hidden></section>
   <p class="mut" style="margin-top:24px">AI 이미지는 참고용이며 실제와 다를 수 있습니다. 가구 치수·간격·가격은 일반 가정값이며 실측과 판매처 가격으로 확인하세요. 상품 링크는 각 쇼핑몰의 검색 링크로, 제휴 승인 전이라 수수료가 없는 임시 링크입니다. 제휴가 시작되면 화면 상단과 견적서에 대가성 문구를 표시합니다.</p>
 </main>
-<script src="layout.js?v=1791209177"></script>
-<script src="samples.js?v=1791209177"></script>
-<script src="editor.js?v=1791209177"></script>
+<script src="layout.js?v=1791211558"></script>
+<script src="samples.js?v=1791211558"></script>
+<script src="editor.js?v=1791211558"></script>
 <script src="samples.local.js" onerror="this.remove()"></script>
 <script>
 // 방문·이용 측정(기본 꺼짐). 쿠키 없이 세는 서비스(예: GoatCounter)의 주소를 넣으면 켜집니다.
@@ -375,8 +376,11 @@ function genSample(hid, t, k) {
   return { id: `gen-${hid}-${t}-${k}`, label: `${a.label} · ${sh.label}`, desc: `${E.TARGETS[t].label} 약 ${(r.W / 100).toFixed(1)}×${(r.D / 100).toFixed(1)}m`, thumb, preset: { housing: hid, target: t, area: a.id, shape, door: "sliding" } };
 }
 function samplesFor(hid, t) {
-  const real = SAMPLES.filter((x) => x.preset.housing === hid && x.preset.target === t).slice(0, 3);
-  const out = real.slice(); for (let k = 0; out.length < 3; k++) out.push(genSample(hid, t, k));
+  // 같은 집 종류·방의 예시를 선택한 평형(전용㎡)과 가까운 순으로 3개. 사진이 3개보다 적으면 도식으로 채운다.
+  const h = E.HOUSING.find((x) => x.id === hid), cur = (h.areas.find((x) => x.id === st.area) || {}).sqm || 0;
+  const sq = (x) => (h.areas.find((a) => a.id === x.preset.area) || {}).sqm || 0;
+  const out = SAMPLES.filter((x) => x.preset.housing === hid && x.preset.target === t).sort((a, b) => Math.abs(sq(a) - cur) - Math.abs(sq(b) - cur)).slice(0, 3);
+  for (let k = 0; out.length < 3; k++) out.push(genSample(hid, t, k));
   return out;
 }
 const sampleOf = (id) => SAMPLES.find((x) => x.id === id) || (/^gen-/.test(id || "") ? (() => { const [, h, t, k] = id.split("-"); return genSample(h, t, Number(k)); })() : null);
@@ -386,7 +390,7 @@ function renderPhotoMode() {
   // 현재 선택(집 종류+방)과 같은 예시만, 정확히 3개: 사진 예시를 먼저, 부족하면 같은 조건의 도식 예시로 채운다.
   const list = samplesFor(st.housing, st.target);
   $("#sampleNote").textContent = `${(E.HOUSING.find((h) => h.id === st.housing) || {}).label} · ${E.TARGETS[st.target].label} 예시 ${list.length}개. 집 종류나 방을 바꾸면 예시도 바뀌어요.`;
-  $("#samples").innerHTML = list.map((x) => `<button type="button" class="card" data-sample="${esc(x.id)}" aria-pressed="${st.sampleId === x.id}">${x.img ? `<img src="${esc(x.img)}" alt="" style="width:100%;height:84px;object-fit:cover;border-radius:8px;margin-bottom:4px">` : `<div style="height:84px;margin-bottom:4px">${x.thumb}</div>`}<b>${esc(x.label)}</b><small>${esc(x.desc)}</small><span class="chip">${x.img ? (x.kind === "ai" ? "AI 생성 사진" : "사진") : "도식(사진 아님)"}</span></button>`).join("");
+  $("#samples").innerHTML = list.map((x) => `<button type="button" class="card" data-sample="${esc(x.id)}" aria-pressed="${st.sampleId === x.id}">${x.img ? `<img src="${esc(x.img)}" alt="" style="width:100%;height:84px;object-fit:cover;border-radius:8px;margin-bottom:4px">` : `<div class="thumbfb" style="height:84px;margin-bottom:4px;overflow:hidden">${x.thumb}</div>`}<b>${esc(x.label)}</b><small>${esc(x.desc)}</small><span class="chip">${x.img ? (x.kind === "ai" ? "AI 생성 예시 사진" : "사진") : "도식(사진 아님)"}</span></button>`).join("");
   const cur = sampleOf(st.sampleId); $("#sampleCredit").textContent = cur && cur.credit ? `사진: ${cur.credit}` : "";
 }
 function applySample(x) {
@@ -465,7 +469,7 @@ function shot() {
 }
 const onArea = (e) => { const h = H(), i = Number($("#areaRange").value), a = h.areas[i]; if (!a) return;
   st.chosen.area = true; st.area = a.id; st.custom = null; syncPlan(); if (!st.touched) resetSizes();
-  renderAreaInfo(); renderAdvSummary(); renderBasicsSummary(); renderLock(); renderFurn(); updateBar(); $("#out").innerHTML = ""; $("#quote").hidden = true; };
+  renderAreaInfo(); renderAdvSummary(); renderBasicsSummary(); renderPhotoMode(); renderStructs(); renderLock(); renderFurn(); updateBar(); $("#out").innerHTML = ""; $("#quote").hidden = true; };
 $("#areaRange").addEventListener("input", onArea); $("#areaRange").addEventListener("pointerdown", () => setTimeout(onArea, 0)); $("#areaRange").addEventListener("keydown", () => setTimeout(onArea, 0));
 $("#baRange").addEventListener("input", (e) => { const v = Number(e.target.value); $("#baBefore").style.clipPath = `inset(0 ${100 - v}% 0 0)`; $("#baLine").style.left = v + "%"; });
 const showCustomWon = () => { $("#customBudgetWon").textContent = st.budget > 0 ? `= ${won(st.budget)}` : ""; };

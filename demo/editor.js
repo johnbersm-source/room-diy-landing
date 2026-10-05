@@ -154,9 +154,9 @@
       document.getElementById("edChk").innerHTML = checks(P, U, cand.regions).map((k) => `<li class="${k.level}">${esc(k.msg)}</li>`).join("");
       document.getElementById("edSel").textContent = sel >= 0 ? `선택: ${P[sel].label} (${P[sel].w}×${P[sel].h}cm)` : "가구를 끌어서 옮기고, 눌러서 선택하세요";
     }
-    m.innerHTML = `<div style="background:var(--bg);color:var(--fg);width:100%;max-width:560px;max-height:94vh;overflow:auto;border-radius:16px 16px 0 0;padding:14px">
+    m.innerHTML = `<div style="background:var(--bg);color:var(--fg);width:100%;max-width:560px;max-height:94vh;overflow:auto;border-radius:16px 16px 0 0;padding:14px;user-select:none;-webkit-user-select:none">
       <h3 style="margin:0 0 6px">끌어서 직접 배치 <span class="mut">(${esc(cand.id)}안에서 시작)</span></h3>
-      <svg id="edSvg" viewBox="0 0 ${vw} ${vh}" style="width:100%;touch-action:none;background:var(--card);border-radius:10px"></svg>
+      <svg id="edSvg" viewBox="0 0 ${vw} ${vh}" style="width:100%;touch-action:none;user-select:none;-webkit-user-select:none;background:var(--card);border-radius:10px"></svg>
       <p class="mut" id="edSel"></p>
       <div class="row seg"><button type="button" data-ed="rot">회전</button><button type="button" data-ed="del">삭제</button><button type="button" data-ed="reset">처음으로</button></div>
       <div class="mut" style="margin-top:6px">추가</div><div class="row seg" id="edPal">${PALETTE.map((p, i) => `<button type="button" data-add="${i}">+ ${p[0]}</button>`).join("")}</div>
@@ -168,12 +168,13 @@
     const pt = (e) => { const p = svgEl.createSVGPoint(); p.x = e.clientX; p.y = e.clientY; const q = p.matrixTransform(svgEl.getScreenCTM().inverse()); return { x: (q.x - M) / s, y: (q.y - M) / s }; };
     const snap = (v) => Math.round(v / 5) * 5;
     svgEl.addEventListener("pointerdown", (e) => {
+      e.preventDefault(); // 끌 때 글자가 선택되는 것 방지
       const g = e.target.closest("[data-i]"); if (!g) { sel = -1; draw(); return; }
       sel = Number(g.dataset.i); const q = pt(e); drag = { dx: q.x - P[sel].x, dy: q.y - P[sel].y };
       svgEl.setPointerCapture(e.pointerId); draw();
     });
     svgEl.addEventListener("pointermove", (e) => {
-      if (!drag || sel < 0) return; const q = pt(e), p = P[sel];
+      if (!drag || sel < 0) return; e.preventDefault(); const q = pt(e), p = P[sel];
       p.x = snap(Math.min(Math.max(q.x - drag.dx, 0), U.W - p.w)); p.y = snap(Math.min(Math.max(q.y - drag.dy, 0), U.D - p.h)); draw();
     });
     const end = () => { drag = null; }; svgEl.addEventListener("pointerup", end); svgEl.addEventListener("pointercancel", end);
