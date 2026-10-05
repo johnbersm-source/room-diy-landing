@@ -50,6 +50,16 @@
   ];
   HOUSING.forEach((h) => h.areas.forEach((a) => { a.id = h.id + a.sqm; a.pyeong = Math.round(a.sqm / PYEONG * 10) / 10; }));
 
+  /* 같은 평형도 구조가 다르다. 베이(거실 양옆 방 2개=3베이, 3개=4베이)와 판상형/타워형 개념은 조사 자료
+   * (docs/ROOM_STRUCTURES.md)를 따랐고, 방 모양·창 크기에 미치는 영향은 확인하지 못한 **가정**이다. */
+  const APT_STRUCTURES = [
+    { id: "unknown", label: "잘 모르겠어요", desc: "일반적인 구조로 시작해요", shape: "std", windows: ["far"], winSize: "md" },
+    { id: "slab3", label: "판상형 3베이", desc: "일자로 배치, 거실 맞은편에 발코니 창. 거실 양옆에 방 2개", shape: "std", windows: ["far"], winSize: "md" },
+    { id: "slab4", label: "판상형 4베이", desc: "거실 가로가 넓고 창이 큰 편. 방 3개가 나란히", shape: "wide", windows: ["far"], winSize: "lg" },
+    { id: "tower", label: "타워형(탑상형)", desc: "한 층에 2~4세대. 거실이 정사각에 가깝고 창이 두 면(모서리)에 있는 경우가 많아요", shape: "sq", windows: ["far", "left"], winSize: "md" },
+    { id: "open", label: "거실·주방이 이어진 개방형", desc: "요즘 평면. 거실이 안쪽으로 길쭉하게 이어져요", shape: "long", windows: ["far"], winSize: "md" },
+  ];
+
   const TARGETS = {
     living: { label: "거실", desc: "소파·TV 중심 공간", anchor: [390, 430] },
     master: { label: "안방", desc: "큰 침대와 옷장 중심", anchor: [340, 330] },
@@ -59,9 +69,10 @@
   const SHAPES = [
     { id: "std", label: "일반적인 방", desc: "가로세로가 무난한 보통 형태" },
     { id: "sq", label: "정사각형에 가까움", desc: "가로세로가 거의 같은 방" },
+    { id: "wide", label: "가로로 넓은 방", desc: "가로(창 쪽)가 긴 방. 4베이 거실 등" },
     { id: "long", label: "길쭉한 방", desc: "한쪽이 긴 직사각형(복도형·좁고 긴 방)" },
   ];
-  const SHAPE_RATIO = { sq: 1.0, long: 0.62 }; // 가로/세로. std는 기준점 비율
+  const SHAPE_RATIO = { sq: 1.0, wide: 1.25, long: 0.62 }; // 가로/세로. std는 기준점 비율
 
   function roomFor(housingId, areaId, target, shape) {
     const h = HOUSING.find((x) => x.id === housingId);
@@ -70,7 +81,7 @@
     let W, D;
     if (t === "room") {
       const area = a.sqm * 0.65 * 10000;
-      const ratio = shape === "sq" ? SHAPE_RATIO.sq : shape === "long" ? SHAPE_RATIO.long : 0.72;
+      const ratio = SHAPE_RATIO[shape] || 0.72;
       W = Math.sqrt(area * ratio); D = area / W;
     } else {
       const f = Math.sqrt(a.sqm / 74);
@@ -656,7 +667,7 @@
     return o + "</svg>";
   }
 
-  const api = { PAD, ROOM_SHRINK, PYEONG, HOUSING, TARGETS, SHAPES, SIZE_OPTIONS, DEFAULT_SIZES, TARGET_DEFAULTS,
+  const api = { PAD, ROOM_SHRINK, PYEONG, HOUSING, APT_STRUCTURES, TARGETS, SHAPES, SIZE_OPTIONS, DEFAULT_SIZES, TARGET_DEFAULTS,
     WALLS, BIG_WALLS, DOOR_POS, DEFAULT_VIEW, MERCHANTS, FIXED_PROMPT, ITEM,
     WIN_SIZES, OBSTACLES, CORNERS, roomFor, suggestSizes, candidates, currentScene, anyApplicable, suggestions, buildQuote, svg, score, planPurchase, usableRoom };
   if (typeof module !== "undefined" && module.exports) module.exports = api;

@@ -59,6 +59,13 @@ textarea{width:100%;font:12px/1.5 ui-monospace,monospace;background:var(--bg);co
 .pin{position:absolute;transform:translate(-50%,-50%);width:26px;height:26px;border-radius:50%;background:var(--bg);border:2px solid var(--acc);color:var(--acc);font-size:12px;font-weight:700;display:flex;align-items:center;justify-content:center;pointer-events:none}
 .pin.done{background:var(--acc);color:#fff}
 .afterbox{border:2px dashed var(--line);border-radius:10px;padding:14px;text-align:center;color:var(--mut);font-size:13px;margin:8px 0}
+[hidden]{display:none!important}
+#camBox{position:fixed;inset:0;background:#000;z-index:50;display:flex;flex-direction:column}
+#camBox video{flex:1;width:100%;object-fit:cover;min-height:0}
+#camBox .hint{position:absolute;top:12px;left:0;right:0;text-align:center;color:#fff;font-size:14px;text-shadow:0 1px 3px #000}
+#camBox .bar2{display:flex;gap:10px;justify-content:center;padding:14px;background:#000}
+#camBox button{width:auto;padding:12px 28px;margin:0}
+.chip{display:inline-block;font-size:11px;color:var(--mut);margin:0 2px}
 .legend i{display:inline-block;width:12px;height:12px;border:1px solid var(--fg);vertical-align:middle;margin:0 4px 0 8px}
 #quote{margin-top:28px;border:2px solid var(--acc);border-radius:14px;padding:16px}
 #quote table{width:100%;border-collapse:collapse;font-size:14px}
@@ -94,8 +101,13 @@ textarea{width:100%;font:12px/1.5 ui-monospace,monospace;background:var(--bg);co
   <p class="mut" id="areaHelp"></p>
   <div class="cards" id="areas"></div>
 
+  <div id="structBox" hidden>
+    <h2 id="structTitle" data-n="우리 집 구조는 어떤가요?">우리 집 구조는 어떤가요?</h2>
+    <p class="mut">같은 평형이어도 구조가 달라요(판상형·타워형, 3베이·4베이 등). 가장 비슷한 것을 고르면 창 위치와 방 모양이 그에 맞게 채워져요. 효과는 추정이라 아래에서 바꿀 수 있어요.</p>
+    <div class="cards" id="structs"></div>
+  </div>
   <h2 id="shapeTitle" data-n="방 모양은 어떤가요?">방 모양은 어떤가요?</h2>
-  <div class="cards sm" id="shapes"></div>
+  <div class="cards two" id="shapes"></div>
   <details style="margin-top:8px"><summary>줄자로 방 크기를 직접 입력하기 (선택)</summary>
     <div class="row">가로 <input id="w" type="number" min="200" max="700" step="10"> cm
       세로 <input id="d" type="number" min="200" max="900" step="10"> cm
@@ -123,26 +135,35 @@ textarea{width:100%;font:12px/1.5 ui-monospace,monospace;background:var(--bg);co
   <div class="row seg" id="photoMode"></div>
   <div id="sampleBox">
     <p class="mut">예시 방을 고르면 위 선택이 그 방에 맞게 채워지고, 견적서에서 놓을 자리가 미리 표시돼요. 사진 없이 바로 체험할 수 있어요.</p>
+    <p class="mut" id="sampleNote"></p>
     <div class="cards sm" id="samples"></div>
     <p class="mut" id="sampleCredit"></p>
   </div>
   <div id="ownBox" hidden>
-    <div class="photo">
-      <input type="file" id="photo" accept="image/*" capture="environment">
-      <img id="preview" alt="" hidden>
+    <div class="row">
+      <button type="button" class="cta" id="camOpen" style="margin-top:0;flex:1">📷 바로 촬영하기</button>
+      <label class="cta ghost" style="margin-top:0;flex:1;text-align:center;cursor:pointer;box-sizing:border-box">🖼 사진 올리기<input type="file" id="photo" accept="image/*" hidden></label>
     </div>
-    <p class="mut">휴대폰에서는 바로 촬영할 수 있어요. 문 앞에 서서 방 전체가 보이게 찍어주세요. 사진은 이 기기에만 저장돼요. 우편물·택배 송장 같은 주소 정보는 찍히지 않게 해주세요.</p>
+    <input type="file" id="photoCapture" accept="image/*" capture="environment" hidden>
+    <img id="preview" alt="" hidden style="max-width:100%;border-radius:10px;margin-top:8px">
+    <p class="mut">문 앞에 서서 방 전체가 보이게 찍어주세요. 사진은 이 기기에만 저장돼요. 우편물·택배 송장 같은 주소 정보는 찍히지 않게 해주세요.</p>
   </div>
   <div class="row seg" id="budget"></div>
   <div class="row" id="customBox" hidden>예산 <input id="customBudget" type="number" min="1" max="100000" step="1" value="150"> 만원 <span class="mut" id="customBudgetWon"></span></div>
   <button class="cta" id="go" type="button">셀프 인테리어 추천 보기</button>
 
+  <div id="camBox" hidden>
+    <video id="camVideo" autoplay playsinline muted></video>
+    <div class="hint">문 앞에 서서 방 전체가 보이게 찍어주세요</div>
+    <div class="bar2"><button class="cta" id="camShot" type="button">촬영</button><button class="cta ghost" id="camClose" type="button" style="color:#fff;border-color:#fff">닫기</button></div>
+  </div>
   <div id="out"></div>
   <section id="quote" hidden></section>
   <p class="mut" style="margin-top:24px">AI 이미지는 참고용이며 실제와 다를 수 있습니다. 가구 치수·간격·가격은 일반 가정값이며 실측과 판매처 가격으로 확인하세요. 상품 링크는 각 쇼핑몰의 검색 링크로, 제휴 승인 전이라 수수료가 없는 임시 링크입니다. 제휴가 시작되면 화면 상단과 견적서에 대가성 문구를 표시합니다.</p>
 </main>
 <script src="layout.js"></script>
 <script src="samples.js"></script>
+<script src="samples.local.js" onerror="this.remove()"></script>
 <script>
 // 방문·이용 측정(기본 꺼짐). 쿠키 없이 세는 서비스(예: GoatCounter)의 주소를 넣으면 켜집니다.
 // 예) const ANALYTICS_URL = "https://내코드.goatcounter.com/count";  (상업적 이용은 유료 플랜 확인 필요)
@@ -158,7 +179,7 @@ const BUDGETS = [5, 15, 30, 50, 100];
 
 const st = { housing: "apt", target: "living", area: "apt59", shape: "std", sizes: E.suggestSizes(E.roomFor("apt", "apt59", "living"), "living"), touched: false,
   view: JSON.parse(JSON.stringify(E.DEFAULT_VIEW)), door: "sliding",
-  locked: new Set(), photoMode: "sample", sampleId: null, photo: null, rental: false, budget: 150000, customBudget: false, custom: null };
+  locked: new Set(), photoMode: "sample", sampleId: null, photo: null, struct: "unknown", rental: false, budget: 150000, customBudget: false, custom: null };
 function renumber() { let n = 1; document.querySelectorAll("main h2[data-n]").forEach((h) => { if (h.closest("[hidden]")) return; h.textContent = `${n++}. ${h.dataset.n}`; }); }
 function renderAdvSummary() {
   const v = st.view, O = E.SIZE_OPTIONS, parts = [`창 ${v.windows.length ? v.windows.map((w) => E.WALLS[w]).join("·") : "없음"}`, `큰 가구 ${E.BIG_WALLS[v.bigWall]}`, `문 ${E.DOOR_POS[v.door]}`];
@@ -224,6 +245,16 @@ function renderTarget() {
   $("#targetBox").hidden = h.targets.length < 2;
   $("#target").innerHTML = h.targets.map((t) => card("target", t, "", E.TARGETS[t].label, esc(E.TARGETS[t].desc), t === st.target)).join("");
 }
+function structSvg(sx) {
+  const r = E.roomFor("apt", "apt84", "living", sx.shape), k = 52 / Math.max(r.W, r.D), w = r.W * k, h = r.D * k, x0 = (110 - w) / 2, y0 = (84 - h) / 2 - 2;
+  const bar = (wall) => { const L = sx.winSize === "lg" ? 0.7 : sx.winSize === "sm" ? 0.3 : 0.5;
+    return wall === "far" ? `<rect x="${x0 + w * (1 - L) / 2}" y="${y0 - 2}" width="${w * L}" height="5" fill="var(--acc)"/>` : wall === "left" ? `<rect x="${x0 - 2}" y="${y0 + h * (1 - L) / 2}" width="5" height="${h * L}" fill="var(--acc)"/>` : `<rect x="${x0 + w - 3}" y="${y0 + h * (1 - L) / 2}" width="5" height="${h * L}" fill="var(--acc)"/>`; };
+  return `<svg viewBox="0 0 110 84" aria-hidden="true"><rect x="${x0}" y="${y0}" width="${w}" height="${h}" fill="var(--acc)" fill-opacity=".15" stroke="var(--fg)" stroke-width="2"/>${sx.windows.map(bar).join("")}<text x="55" y="80" font-size="8" text-anchor="middle" fill="var(--acc)">▲ 문(촬영 위치)</text></svg>`;
+}
+function renderStructs() {
+  $("#structBox").hidden = st.housing !== "apt";
+  $("#structs").innerHTML = E.APT_STRUCTURES.map((sx) => card("struct", sx.id, structSvg(sx), sx.label, esc(sx.desc), st.struct === sx.id)).join("");
+}
 function renderAreas() {
   const h = H(), max = Math.max(...h.areas.map((a) => a.sqm)), n = h.targets.length < 2 ? 2 : 3;
   $("#areaTitle").dataset.n = h.id === "apt" ? "아파트 평형을 골라주세요" : "집 크기(전용면적)를 골라주세요";
@@ -278,12 +309,16 @@ function renderBudget() {
     `<button type="button" data-b="custom" aria-pressed="${st.customBudget}">직접 입력 (100만원 초과 등)</button>`;
   $("#customBox").hidden = !st.customBudget;
 }
-const SAMPLES = window.SAMPLES || [];
+const SAMPLES = (window.SAMPLES || []).concat(window.SAMPLES_LOCAL || []);
 const sampleOf = (id) => SAMPLES.find((x) => x.id === id);
 function renderPhotoMode() {
   $("#photoMode").innerHTML = [["sample", "예시 방으로 해보기"], ["own", "내 방 사진으로 진행"]].map(([m, t]) => `<button type="button" data-pmode="${m}" aria-pressed="${st.photoMode === m}">${t}</button>`).join("");
   $("#sampleBox").hidden = st.photoMode !== "sample"; $("#ownBox").hidden = st.photoMode !== "own";
-  $("#samples").innerHTML = SAMPLES.map((x) => `<button type="button" class="card" data-sample="${esc(x.id)}" aria-pressed="${st.sampleId === x.id}"><img src="${esc(x.img)}" alt="" style="width:100%;height:84px;object-fit:cover;border-radius:8px;margin-bottom:4px"><b>${esc(x.label)}</b><small>${esc(x.desc)}</small></button>`).join("");
+  const score = (x) => (x.preset.housing === st.housing ? 4 : 0) + (x.preset.target === st.target ? 2 : 0) + (x.preset.area === st.area ? 1 : 0) + (x.preset.shape === st.shape ? 1 : 0);
+  const list = [...SAMPLES].sort((a, b) => score(b) - score(a));
+  const same = list.some((x) => x.preset.housing === st.housing && x.preset.target === st.target);
+  $("#sampleNote").textContent = same ? "고르신 집과 비슷한 예시부터 보여드려요." : "고르신 집 종류·방과 같은 예시 사진은 아직 없어요. 가까운 예시를 골라 체험하거나 '내 방 사진으로 진행'을 눌러주세요.";
+  $("#samples").innerHTML = list.map((x) => `<button type="button" class="card" data-sample="${esc(x.id)}" aria-pressed="${st.sampleId === x.id}"><img src="${esc(x.img)}" alt="" style="width:100%;height:84px;object-fit:cover;border-radius:8px;margin-bottom:4px"><b>${esc(x.label)}</b><small>${esc(x.desc)}</small><span class="chip">${esc((E.HOUSING.find((h) => h.id === x.preset.housing) || {}).label || "")} · ${esc((E.TARGETS[x.preset.target] || {}).label || "")}</span></button>`).join("");
   const cur = sampleOf(st.sampleId); $("#sampleCredit").textContent = cur ? `사진: ${cur.credit}` : "";
 }
 function applySample(x) {
@@ -294,7 +329,7 @@ function applySample(x) {
   st.photoMode = "sample"; st.sampleId = x.id; st.photo = x.img;
 }
 function renderAll() {
-  renderAdvSummary(); renderPhotoMode();
+  renderAdvSummary(); renderPhotoMode(); renderStructs();
   renderHousing(); renderTarget(); renderAreas(); renderView(); renderFurn(); renderLock(); renderBudget(); renumber(); $("#out").innerHTML = ""; $("#quote").hidden = true;
 }
 
@@ -304,10 +339,11 @@ document.addEventListener("click", (e) => {
   if (c) {
     const g = c.dataset.g, v = c.dataset.v, O = E.SIZE_OPTIONS;
     let touchSize = false;
-    if (g === "housing") { st.housing = v; const h = H(); st.target = h.targets[0]; st.area = h.areas[Math.min(3, h.areas.length - 1)].id; st.custom = null; st.locked.clear(); resetSizes(); }
+    if (g === "housing") { st.struct = "unknown"; st.housing = v; const h = H(); st.target = h.targets[0]; st.area = h.areas[Math.min(3, h.areas.length - 1)].id; st.custom = null; st.locked.clear(); resetSizes(); }
     else if (g === "target") { st.target = v; st.custom = null; st.locked.clear(); resetSizes(); }
     else if (g === "area") { st.area = v; st.custom = null; if (!st.touched) resetSizes(); }
     else if (g === "shape") { st.shape = v; st.custom = null; if (!st.touched) resetSizes(); }
+    else if (g === "struct") { const sx = E.APT_STRUCTURES.find((x) => x.id === v); st.struct = v; st.shape = sx.shape; st.view.windows = [...sx.windows]; st.view.winSize = sx.winSize; st.custom = null; if (!st.touched) resetSizes(); track("struct-" + v); }
     else if (g === "win") { const i = st.view.windows.indexOf(v); i >= 0 ? st.view.windows.splice(i, 1) : st.view.windows.push(v); }
     else if (g === "big") st.view.bigWall = v;
     else if (g === "door") st.view.door = v;
@@ -331,6 +367,21 @@ document.addEventListener("click", (e) => {
   if (b) { if (b.dataset.b === "custom") { st.customBudget = true; st.budget = Math.round(Number($("#customBudget").value) * 10000) || 0; showCustomWon(); }
     else { st.customBudget = false; st.budget = Number(b.dataset.b); } renderBudget(); return; }
 });
+let camStream = null;
+async function openCam() {
+  if (!(navigator.mediaDevices && navigator.mediaDevices.getUserMedia)) { $("#photoCapture").click(); return; }
+  try { camStream = await navigator.mediaDevices.getUserMedia({ video: { facingMode: { ideal: "environment" } }, audio: false });
+    $("#camVideo").srcObject = camStream; $("#camBox").hidden = false; track("camera-open"); }
+  catch (e) { alert("카메라를 바로 열 수 없어요(권한을 확인해주세요). 대신 휴대폰 카메라 앱으로 촬영합니다."); $("#photoCapture").click(); }
+}
+function closeCam() { if (camStream) { camStream.getTracks().forEach((t) => t.stop()); camStream = null; } $("#camBox").hidden = true; }
+function shot() {
+  const v = $("#camVideo"); if (!v.videoWidth) return;
+  const k = Math.min(1, 900 / Math.max(v.videoWidth, v.videoHeight)), cv = document.createElement("canvas");
+  cv.width = Math.round(v.videoWidth * k); cv.height = Math.round(v.videoHeight * k); cv.getContext("2d").drawImage(v, 0, 0, cv.width, cv.height);
+  st.ownPhoto = cv.toDataURL("image/jpeg", 0.72); st.photo = st.ownPhoto; st.sampleId = null;
+  const img = $("#preview"); img.src = st.photo; img.hidden = false; closeCam(); track("own-photo-camera");
+}
 const showCustomWon = () => { $("#customBudgetWon").textContent = st.budget > 0 ? `= ${won(st.budget)}` : ""; };
 $("#customBudget").addEventListener("input", (e) => { st.budget = Math.round(Number(e.target.value) * 10000) || 0; showCustomWon(); });
 ["#w", "#d"].forEach((s) => $(s).addEventListener("input", () => {
@@ -345,11 +396,12 @@ function compress(file) {
       URL.revokeObjectURL(url); res(cv.toDataURL("image/jpeg", 0.72)); };
     img.onerror = () => res(null); img.src = url; });
 }
-$("#photo").addEventListener("change", async (e) => {
+const onPhotoFile = async (e) => {
   const f = e.target.files[0]; if (!f) return;
   st.ownPhoto = await compress(f); st.photo = st.ownPhoto; st.sampleId = null; track("own-photo");
   const img = $("#preview"); if (st.photo) { img.src = st.photo; img.hidden = false; }
-});
+};
+$("#photo").addEventListener("change", onPhotoFile); $("#photoCapture").addEventListener("change", onPhotoFile);
 
 /* ---------- 결과와 견적서 ---------- */
 let LAST = null;
@@ -507,6 +559,9 @@ document.addEventListener("click", (e) => {
   const lk = e.target.closest("a[data-click]");
   if (lk) { const id = curQuoteId(), all = loadQ(), rec = all.find((q) => q.id === id);
     if (rec) { const k = lk.dataset.click; rec.clicks[k] = (rec.clicks[k] || 0) + 1; saveQ(all); } track("merchant-" + lk.dataset.m); return; }
+  if (e.target.closest("#camOpen")) { openCam(); return; }
+  if (e.target.closest("#camShot")) { shot(); return; }
+  if (e.target.closest("#camClose")) { closeCam(); return; }
   const pmode = e.target.closest("[data-pmode]");
   if (pmode) { st.photoMode = pmode.dataset.pmode; if (st.photoMode === "own") { st.sampleId = null; st.photo = st.ownPhoto || null; } renderPhotoMode(); return; }
   const smp = e.target.closest("[data-sample]");
