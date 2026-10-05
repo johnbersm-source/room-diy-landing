@@ -5,12 +5,12 @@
 <meta name="viewport" content="width=device-width,initial-scale=1">
 <title>프로토타입 — 셀프 인테리어 배치와 견적서</title>
 <style>
-:root{--bg:#fff;--fg:#1c1c1e;--mut:#6b6b70;--line:#e5e5ea;--acc:#2f6f4f;--card:#f6f6f8;--err:#c0392b;--warn:#b7791f;--lock:#f6c9c3}
-@media(prefers-color-scheme:dark){:root{--bg:#121214;--fg:#f2f2f4;--mut:#9a9aa2;--line:#2c2c30;--acc:#6fcf9b;--card:#1c1c20;--err:#ff7b6b;--warn:#f0b955;--lock:#6b2f29}}
+:root{--selbg:#e8f3ec;--bg:#fff;--fg:#1c1c1e;--mut:#6b6b70;--line:#e5e5ea;--acc:#2f6f4f;--card:#f6f6f8;--err:#c0392b;--warn:#b7791f;--lock:#f6c9c3}
+@media(prefers-color-scheme:dark){:root{--selbg:#1d3328;--bg:#121214;--fg:#f2f2f4;--mut:#9a9aa2;--line:#2c2c30;--acc:#6fcf9b;--card:#1c1c20;--err:#ff7b6b;--warn:#f0b955;--lock:#6b2f29}}
 *{box-sizing:border-box}
 body{margin:0;background:var(--bg);color:var(--fg);font:16px/1.6 -apple-system,"Apple SD Gothic Neo","Noto Sans KR",sans-serif}
 .notice{background:var(--card);border-bottom:1px solid var(--line);font-size:12px;color:var(--mut);padding:8px 16px;text-align:center}
-main{max-width:560px;margin:0 auto;padding:0 16px 48px}
+main{max-width:560px;margin:0 auto;padding:0 16px 110px}
 h1{font-size:24px;margin:24px 0 4px}h2{font-size:19px;margin:28px 0 8px}h3{margin:14px 0 6px;font-size:15px}
 .mut{color:var(--mut);font-size:14px}
 .cards{display:grid;grid-template-columns:repeat(auto-fill,minmax(150px,1fr));gap:10px}
@@ -76,6 +76,22 @@ textarea{width:100%;font:12px/1.5 ui-monospace,monospace;background:var(--bg);co
 .start{background:var(--card);border:2px solid var(--line);border-radius:14px;padding:12px;text-align:left;cursor:pointer;font:inherit;color:inherit}
 .start b{display:block;font-size:15px;margin-bottom:2px}.start small{color:var(--mut);font-size:12px;line-height:1.4;display:block}
 .start.pri{border-color:var(--acc)}
+.segs{display:grid;gap:1px;background:var(--line);border:1px solid var(--line);border-radius:12px;overflow:hidden}
+.segs.c2{grid-template-columns:repeat(2,1fr)}.segs.c3{grid-template-columns:repeat(3,1fr)}
+.segs button{background:var(--bg);border:0;padding:15px 6px;min-height:52px;font:inherit;font-size:15px;color:inherit;cursor:pointer}
+.segs button[aria-pressed=true]{background:var(--selbg);color:var(--acc);font-weight:700;box-shadow:inset 0 0 0 2px var(--acc)}
+.gt{font-size:16px;margin:24px 0 8px}.gt small{color:var(--mut);font-weight:400}
+.req{font-style:normal;font-size:11px;color:#fff;background:var(--acc);border-radius:6px;padding:1px 6px;margin-left:6px;vertical-align:middle}
+@media(prefers-color-scheme:dark){.req{color:#0b2a1a}}
+.slider{width:100%;accent-color:var(--acc);height:30px;margin:6px 0 0}
+.ticks{display:flex;justify-content:space-between;font-size:13px;color:var(--mut)}
+.info{background:var(--card);border-radius:10px;padding:10px 12px;font-size:14px;margin:8px 0 0;line-height:1.5}
+.info.unset{color:var(--mut)}
+#bar{position:fixed;left:0;right:0;bottom:0;z-index:20;background:var(--bg);border-top:1px solid var(--line);padding:10px 16px calc(10px + env(safe-area-inset-bottom))}
+#bar>div{max-width:560px;margin:0 auto}
+#bar .cta{margin:0;width:100%}
+#bar .cta.off{background:#4a4a4d;color:#fff}
+.flash{animation:fl 1.2s}@keyframes fl{0%,60%{box-shadow:0 0 0 3px var(--acc)}100%{box-shadow:none}}
 .legend i{display:inline-block;width:12px;height:12px;border:1px solid var(--fg);vertical-align:middle;margin:0 4px 0 8px}
 #quote{margin-top:28px;border:2px solid var(--acc);border-radius:14px;padding:16px}
 #quote table{width:100%;border-collapse:collapse;font-size:14px}
@@ -115,34 +131,23 @@ textarea{width:100%;font:12px/1.5 ui-monospace,monospace;background:var(--bg);co
 
   <details id="basics" class="adv" open>
     <summary id="basicsSummary">우리 집 선택</summary>
-  <h2 data-n="어떤 집인가요?">어떤 집인가요?</h2>
-  <div class="cards" id="housing"></div>
-
-  <div id="targetBox">
-    <h2 data-n="어느 방을 꾸밀까요?">어느 방을 꾸밀까요?</h2>
-    <div class="cards" id="target"></div>
-  </div>
-
-  <h2 id="areaTitle" data-n="집 크기를 골라주세요">집 크기를 골라주세요</h2>
-  <p class="mut" id="areaHelp"></p>
-  <div class="cards" id="areas"></div>
-
-  <div id="structBox" hidden>
-    <h2 id="structTitle" data-n="우리 집 구조는 어떤가요?">우리 집 구조는 어떤가요?</h2>
-    <p class="mut">같은 평형이어도 구조가 달라요(판상형·타워형, 3베이·4베이 등). 가장 비슷한 것을 고르면 창 위치와 방 모양이 그에 맞게 채워져요. 효과는 추정이라 아래에서 바꿀 수 있어요.</p>
-    <div class="cards" id="structs"></div>
-  </div>
-  <h2 id="shapeTitle" data-n="방 모양은 어떤가요?">방 모양은 어떤가요?</h2>
-  <div class="cards two" id="shapes"></div>
-  <details style="margin-top:8px"><summary>줄자로 방 크기를 직접 입력하기 (선택)</summary>
-    <div class="row">가로 <input id="w" type="number" min="200" max="700" step="10"> cm
-      세로 <input id="d" type="number" min="200" max="900" step="10"> cm
-      <button type="button" id="clearCustom" class="card" style="padding:6px 10px">입력 취소</button></div>
-    <p class="mut">가로 = 문을 열고 섰을 때 좌우 벽 사이, 세로 = 입구 벽에서 맞은편 벽까지. 입력하면 위 선택보다 우선합니다.</p>
+    <div class="grp" id="gHousing"><h3 class="gt">집 종류 <i class="req">필수</i></h3><div class="segs c3" id="housing"></div><p class="mut" id="housingDesc"></p></div>
+    <div class="grp" id="targetBox"><h3 class="gt">꾸밀 방</h3><div class="segs c3" id="target"></div><p class="mut" id="targetDesc"></p></div>
+    <div class="grp" id="gArea"><h3 class="gt" id="areaTitle">평형 <i class="req">필수</i></h3>
+      <input type="range" class="slider" id="areaRange" min="0" max="6" step="1" value="0" aria-label="평형 선택">
+      <div class="ticks"><span id="tickMin"></span><span id="tickMax"></span></div>
+      <p class="info unset" id="areaInfo"></p></div>
+    <div class="grp" id="structBox" hidden><h3 class="gt">우리 집 구조</h3><div class="segs c2" id="structs"></div><p class="mut" id="structDesc"></p></div>
+    <div class="grp"><h3 class="gt">방 모양</h3><div class="segs c2" id="shapes"></div></div>
+    <details style="margin-top:12px"><summary>줄자로 방 크기를 직접 입력하기 (선택)</summary>
+      <div class="row">가로 <input id="w" type="number" min="200" max="700" step="10"> cm
+        세로 <input id="d" type="number" min="200" max="900" step="10"> cm
+        <button type="button" id="clearCustom" class="card" style="padding:6px 10px">입력 취소</button></div>
+      <p class="mut">가로 = 문을 열고 섰을 때 좌우 벽 사이, 세로 = 입구 벽에서 맞은편 벽까지. 입력하면 위 선택보다 우선합니다.</p>
+    </details>
+    <p class="mut" id="roomLine"></p>
   </details>
-  <p class="mut" id="roomLine"></p>
 
-  </details>
   <details id="adv" class="adv">
     <summary id="advSummary">우리 집과 다르면 바꾸기 (선택)</summary>
     <h3 style="margin-top:14px">문을 열고 들어서서 보면?</h3>
@@ -156,10 +161,9 @@ textarea{width:100%;font:12px/1.5 ui-monospace,monospace;background:var(--bg);co
     <div class="plan" id="lockPlan"></div>
     <p class="mut legend"><i style="background:var(--lock)"></i>이동 불가 <i style="background:var(--card)"></i>이동 가능</p>
   </details>
-  <label class="row"><input type="checkbox" id="rental"> 임대라서 못을 박을 수 없어요 (무타공 제품 위주로 추천해요)</label>
 
-  <h2 data-n="방 사진과 예산">방 사진과 예산</h2>
-  <div class="row seg" id="photoMode"></div>
+  <div class="grp"><h3 class="gt">방 사진 <small>(선택)</small></h3>
+  <div class="segs c2" id="photoMode"></div>
   <div id="sampleBox">
     <p class="mut">예시 방을 고르면 위 선택이 그 방에 맞게 채워지고, 견적서에서 놓을 자리가 미리 표시돼요. 사진 없이 바로 체험할 수 있어요.</p>
     <p class="mut" id="sampleNote"></p>
@@ -174,10 +178,12 @@ textarea{width:100%;font:12px/1.5 ui-monospace,monospace;background:var(--bg);co
     <input type="file" id="photoCapture" accept="image/*" capture="environment" hidden>
     <img id="preview" alt="" hidden style="max-width:100%;border-radius:10px;margin-top:8px">
     <p class="mut">문 앞에 서서 방 전체가 보이게 찍어주세요. 사진은 이 기기에만 저장돼요. 우편물·택배 송장 같은 주소 정보는 찍히지 않게 해주세요.</p>
-  </div>
-  <div class="row seg" id="budget"></div>
-  <div class="row" id="customBox" hidden>예산 <input id="customBudget" type="number" min="1" max="100000" step="1" value="150"> 만원 <span class="mut" id="customBudgetWon"></span></div>
-  <button class="cta" id="go" type="button">셀프 인테리어 추천 보기</button>
+  </div></div>
+  <div class="grp" id="gBudget"><h3 class="gt">예산 <i class="req">필수</i></h3>
+  <div class="segs c3" id="budget"></div>
+  <div class="row" id="customBox" hidden>예산 <input id="customBudget" type="number" min="1" max="100000" step="1" value="150"> 만원 <span class="mut" id="customBudgetWon"></span></div></div>
+  <label class="row"><input type="checkbox" id="rental"> 임대라서 못을 박을 수 없어요 (무타공 제품 위주로 추천해요)</label>
+  <div id="bar"><div><button class="cta off" id="go" type="button">필수 항목을 선택해주세요</button></div></div>
 
   <div id="camBox" hidden>
     <video id="camVideo" autoplay playsinline muted></video>
@@ -204,7 +210,7 @@ const esc = (s) => String(s).replace(/[&<>"]/g, (c) => ({ "&": "&amp;", "<": "&l
 const won = (n) => n.toLocaleString("ko-KR") + "원";
 const BUDGETS = [5, 15, 30, 50, 100];
 
-const st = { housing: "apt", target: "living", area: "apt59", shape: "std", sizes: E.suggestSizes(E.roomFor("apt", "apt59", "living"), "living"), touched: false,
+const st = { chosen: { housing: false, area: false, budget: false }, housing: "apt", target: "living", area: "apt59", shape: "std", sizes: E.suggestSizes(E.roomFor("apt", "apt59", "living"), "living"), touched: false,
   view: JSON.parse(JSON.stringify(E.DEFAULT_VIEW)), door: "sliding",
   locked: new Set(), photoMode: "sample", sampleId: null, photo: null, struct: "unknown", rental: false, budget: 150000, customBudget: false, custom: null };
 function renumber() { let n = 1; document.querySelectorAll("main h2[data-n]").forEach((h) => { if (h.closest("[hidden]")) return; h.textContent = `${n++}. ${h.dataset.n}`; }); }
@@ -260,17 +266,20 @@ function doorOpenSvg(swing) {
   return `<svg viewBox="0 0 110 60" aria-hidden="true"><rect x="10" y="10" width="90" height="46" fill="none" stroke="var(--fg)" stroke-width="2"/><rect x="25" y="7" width="60" height="6" fill="var(--acc)"/>
     ${swing ? `<path d="M25 13 A30 30 0 0 1 55 43 L55 13 Z" fill="none" stroke="var(--acc)" stroke-dasharray="3 3"/>` : `<path d="M30 20 H80 M70 16 L80 20 L70 24" fill="none" stroke="var(--acc)" stroke-width="2"/>`}</svg>`;
 }
+const segBtn = (g, v, label, pressed) => `<button type="button" data-g="${g}" data-v="${esc(v)}" aria-pressed="${pressed}">${esc(label)}</button>`;
 const card = (grp, val, svg, title, sub, pressed) =>
   `<button type="button" class="card" data-g="${grp}" data-v="${esc(val)}" aria-pressed="${pressed}">${svg || ""}<b>${esc(title)}</b>${sub ? `<small>${sub}</small>` : ""}</button>`;
 
 /* ---------- 렌더 ---------- */
 function renderHousing() {
-  $("#housing").innerHTML = E.HOUSING.map((x) => card("housing", x.id, "", x.label, esc(x.desc), x.id === st.housing)).join("");
+  $("#housing").innerHTML = E.HOUSING.map((x) => segBtn("housing", x.id, x.label, st.chosen.housing && x.id === st.housing)).join("");
+  $("#housingDesc").textContent = st.chosen.housing ? H().desc : "";
 }
 function renderTarget() {
   const h = H();
   $("#targetBox").hidden = h.targets.length < 2;
-  $("#target").innerHTML = h.targets.map((t) => card("target", t, "", E.TARGETS[t].label, esc(E.TARGETS[t].desc), t === st.target)).join("");
+  $("#target").innerHTML = h.targets.map((t) => segBtn("target", t, E.TARGETS[t].label, t === st.target)).join("");
+  $("#targetDesc").textContent = E.TARGETS[st.target].desc;
 }
 function structSvg(sx) {
   const r = E.roomFor("apt", "apt84", "living", sx.shape), k = 52 / Math.max(r.W, r.D), w = r.W * k, h = r.D * k, x0 = (110 - w) / 2, y0 = (84 - h) / 2 - 2;
@@ -280,22 +289,24 @@ function structSvg(sx) {
 }
 function renderStructs() {
   $("#structBox").hidden = st.housing !== "apt";
-  $("#structs").innerHTML = E.APT_STRUCTURES.map((sx) => card("struct", sx.id, structSvg(sx), sx.label, esc(sx.desc), st.struct === sx.id)).join("");
+  $("#structs").innerHTML = E.APT_STRUCTURES.map((sx) => segBtn("struct", sx.id, sx.label, st.struct === sx.id)).join("");
+  const cur = E.APT_STRUCTURES.find((x) => x.id === st.struct); $("#structDesc").textContent = cur ? cur.desc : "";
+}
+function renderAreaInfo() {
+  const h = H(), a = h.areas.find((x) => x.id === st.area), r = room(), el = $("#areaInfo");
+  el.classList.toggle("unset", !st.chosen.area);
+  el.innerHTML = st.chosen.area && a
+    ? `<b>${esc(a.label)}</b> · 전용 약 ${a.sqm}㎡ (${a.pyeong}평)<br>${esc(a.desc)}<br>${esc(E.TARGETS[st.target].label)} 크기(추정) 약 ${(r.W / 100).toFixed(1)}×${(r.D / 100).toFixed(1)}m${st.custom ? " (직접 입력)" : ""}`
+    : "슬라이더를 움직여 크기를 선택해주세요";
+  $("#roomLine").textContent = `선택한 ${E.TARGETS[st.target].label} 크기(추정): 가로 ${r.W}cm × 세로 ${r.D}cm${st.custom ? " (직접 입력)" : ""}`;
 }
 function renderAreas() {
-  const h = H(), max = Math.max(...h.areas.map((a) => a.sqm)), n = h.targets.length < 2 ? 2 : 3;
-  $("#areaTitle").dataset.n = h.id === "apt" ? "아파트 평형을 골라주세요" : "집 크기(전용면적)를 골라주세요";
-  $("#areaHelp").textContent = h.id === "apt"
-    ? "평형은 분양 때 부르는 공급평수예요(전용면적은 보통 그보다 작습니다). 24평형·32평형처럼 부르는 크기는 같은 카드에 있어요. 그림은 집 전체와 꾸밀 방(색칠)의 대략적인 비율이에요."
-    : "그림은 집 전체(바깥 사각형)와 꾸밀 방(색칠)의 대략적인 비율이에요. 방 크기는 추정치입니다.";
-  $("#areas").innerHTML = h.areas.map((a) => {
-    const r = E.roomFor(h.id, a.id, st.target, "std");
-    return card("area", a.id, areaSvg(a, h, max), a.label, `전용 약 ${a.sqm}㎡ (${a.pyeong}평)<br>${esc(a.desc)}<br>${E.TARGETS[st.target].label} 약 ${(r.W / 100).toFixed(1)}×${(r.D / 100).toFixed(1)}m`, a.id === st.area && !st.custom);
-  }).join("");
-  $("#shapeTitle").dataset.n = "방 모양은 어떤가요?";
-  $("#shapes").innerHTML = E.SHAPES.map((s) => card("shape", s.id, shapeSvg(s.id), s.label, esc(s.desc), s.id === st.shape && !st.custom)).join("");
-  const r = room();
-  $("#roomLine").textContent = `선택한 ${E.TARGETS[st.target].label} 크기(추정): 가로 ${r.W}cm × 세로 ${r.D}cm${st.custom ? " (직접 입력)" : ""}`;
+  const h = H(), n = h.areas.length, idx = Math.max(0, h.areas.findIndex((a) => a.id === st.area));
+  $("#areaTitle").innerHTML = (h.id === "apt" ? "평형 (공급면적)" : "집 크기 (전용면적)") + ' <i class="req">필수</i>';
+  const rg = $("#areaRange"); rg.max = n - 1; rg.value = idx;
+  $("#tickMin").textContent = h.areas[0].label; $("#tickMax").textContent = h.areas[n - 1].label;
+  renderAreaInfo();
+  $("#shapes").innerHTML = E.SHAPES.map((x) => segBtn("shape", x.id, x.label, x.id === st.shape && !st.custom)).join("");
 }
 function renderView() {
   const on = (w) => st.view.windows.includes(w);
@@ -332,8 +343,8 @@ function renderLock() {
   $("#lockPlan").innerHTML = E.svg(r, E.currentScene(r, engineOpts()), { interactive: true, locked: [...st.locked] });
 }
 function renderBudget() {
-  $("#budget").innerHTML = BUDGETS.map((b) => `<button type="button" data-b="${b * 10000}" aria-pressed="${!st.customBudget && st.budget === b * 10000}">${b}만원</button>`).join("") +
-    `<button type="button" data-b="custom" aria-pressed="${st.customBudget}">직접 입력 (100만원 초과 등)</button>`;
+  $("#budget").innerHTML = BUDGETS.map((b) => `<button type="button" data-b="${b * 10000}" aria-pressed="${st.chosen.budget && !st.customBudget && st.budget === b * 10000}">${b}만원</button>`).join("") +
+    `<button type="button" data-b="custom" aria-pressed="${st.customBudget}">직접 입력</button>`;
   $("#customBox").hidden = !st.customBudget;
 }
 function renderBasicsSummary() {
@@ -341,36 +352,56 @@ function renderBasicsSummary() {
   $("#basicsSummary").innerHTML = `우리 집 선택 <span class="mut">· ${esc(h.label)} · ${esc(a ? a.label : "")} · ${esc(E.TARGETS[st.target].label)} · ${esc(sh ? sh.label : "")}${st.custom ? " · 줄자 입력" : ""}</span>`;
 }
 const SAMPLES = (window.SAMPLES || []).concat(window.SAMPLES_LOCAL || []);
-const sampleOf = (id) => SAMPLES.find((x) => x.id === id);
+// 사진이 없는 조합은 엔진이 그리는 도식 예시(작은/보통/큰 집 × 모양)로 3개를 채운다. 사진은 아니다.
+const GEN_PICKS = [[0.25, "std"], [0.55, "wide"], [0.85, "std"]];
+function genSample(hid, t, k) {
+  const h = E.HOUSING.find((x) => x.id === hid), [pos, shape] = GEN_PICKS[k], a = h.areas[Math.round(pos * (h.areas.length - 1))];
+  const sh = E.SHAPES.find((x) => x.id === shape), r = E.roomFor(hid, a.id, t, shape), sizes = E.suggestSizes(r, t);
+  const o = { housing: hid, target: t, sizes, view: JSON.parse(JSON.stringify(E.DEFAULT_VIEW)), door: "sliding", locked: [] };
+  let thumb = ""; try { thumb = E.svg(r, E.currentScene(r, o), {}); } catch (e) {}
+  return { id: `gen-${hid}-${t}-${k}`, label: `${a.label} · ${sh.label}`, desc: `${E.TARGETS[t].label} 약 ${(r.W / 100).toFixed(1)}×${(r.D / 100).toFixed(1)}m`, thumb, preset: { housing: hid, target: t, area: a.id, shape, door: "sliding" } };
+}
+function samplesFor(hid, t) {
+  const real = SAMPLES.filter((x) => x.preset.housing === hid && x.preset.target === t).slice(0, 3);
+  const out = real.slice(); for (let k = 0; out.length < 3; k++) out.push(genSample(hid, t, k));
+  return out;
+}
+const sampleOf = (id) => SAMPLES.find((x) => x.id === id) || (/^gen-/.test(id || "") ? (() => { const [, h, t, k] = id.split("-"); return genSample(h, t, Number(k)); })() : null);
 function renderPhotoMode() {
   $("#photoMode").innerHTML = [["sample", "예시 방으로 해보기"], ["own", "내 방 사진으로 진행"]].map(([m, t]) => `<button type="button" data-pmode="${m}" aria-pressed="${st.photoMode === m}">${t}</button>`).join("");
   $("#sampleBox").hidden = st.photoMode !== "sample"; $("#ownBox").hidden = st.photoMode !== "own";
-  const score = (x) => (x.preset.housing === st.housing ? 4 : 0) + (x.preset.target === st.target ? 2 : 0) + (x.preset.area === st.area ? 1 : 0) + (x.preset.shape === st.shape ? 1 : 0);
-  const list = [...SAMPLES].sort((a, b) => score(b) - score(a));
-  const same = list.some((x) => x.preset.housing === st.housing && x.preset.target === st.target);
-  $("#sampleNote").textContent = same ? "고르신 집과 비슷한 예시부터 보여드려요." : "고르신 집 종류·방과 같은 예시 사진은 아직 없어요. 가까운 예시를 골라 체험하거나 '내 방 사진으로 진행'을 눌러주세요.";
-  $("#samples").innerHTML = list.map((x) => `<button type="button" class="card" data-sample="${esc(x.id)}" aria-pressed="${st.sampleId === x.id}"><img src="${esc(x.img)}" alt="" style="width:100%;height:84px;object-fit:cover;border-radius:8px;margin-bottom:4px"><b>${esc(x.label)}</b><small>${esc(x.desc)}</small><span class="chip">${esc((E.HOUSING.find((h) => h.id === x.preset.housing) || {}).label || "")} · ${esc((E.TARGETS[x.preset.target] || {}).label || "")}${x.kind === "ai" ? " · AI 생성" : ""}</span></button>`).join("");
-  const cur = sampleOf(st.sampleId); $("#sampleCredit").textContent = cur ? `사진: ${cur.credit}` : "";
+  // 현재 선택(집 종류+방)과 같은 예시만, 정확히 3개: 사진 예시를 먼저, 부족하면 같은 조건의 도식 예시로 채운다.
+  const list = samplesFor(st.housing, st.target);
+  $("#sampleNote").textContent = `${(E.HOUSING.find((h) => h.id === st.housing) || {}).label} · ${E.TARGETS[st.target].label} 예시 ${list.length}개. 집 종류나 방을 바꾸면 예시도 바뀌어요.`;
+  $("#samples").innerHTML = list.map((x) => `<button type="button" class="card" data-sample="${esc(x.id)}" aria-pressed="${st.sampleId === x.id}">${x.img ? `<img src="${esc(x.img)}" alt="" style="width:100%;height:84px;object-fit:cover;border-radius:8px;margin-bottom:4px">` : `<div style="height:84px;margin-bottom:4px">${x.thumb}</div>`}<b>${esc(x.label)}</b><small>${esc(x.desc)}</small><span class="chip">${x.img ? (x.kind === "ai" ? "AI 생성 사진" : "사진") : "도식(사진 아님)"}</span></button>`).join("");
+  const cur = sampleOf(st.sampleId); $("#sampleCredit").textContent = cur && cur.credit ? `사진: ${cur.credit}` : "";
 }
 function applySample(x) {
   const p = x.preset;
   st.housing = p.housing; st.target = p.target; st.area = p.area; st.shape = p.shape || "std"; st.custom = null; st.locked.clear();
   st.view = JSON.parse(JSON.stringify(Object.assign({}, E.DEFAULT_VIEW, p.view || {}))); st.door = p.door || "sliding";
   st.sizes = Object.assign({}, E.suggestSizes(room(), st.target), p.sizes || {}); st.touched = true;
-  st.photoMode = "sample"; st.sampleId = x.id; st.photo = x.img;
+  st.chosen.housing = true; st.chosen.area = true;
+  st.photoMode = "sample"; st.sampleId = x.id; st.photo = x.img || null;
+}
+function missing() { const m = []; if (!st.chosen.housing) m.push(["집 종류", "#gHousing"]); if (!st.chosen.area) m.push(["평형", "#gArea"]); if (!st.chosen.budget || !(st.budget > 0)) m.push(["예산", "#gBudget"]); return m; }
+function updateBar() {
+  const m = missing(), b = $("#go");
+  b.classList.toggle("off", m.length > 0);
+  b.textContent = m.length ? `필수 항목을 선택해주세요 (${m.length}개 남음)` : "셀프 인테리어 추천 보기";
 }
 function renderAll() {
-  renderAdvSummary(); renderBasicsSummary(); renderPhotoMode(); renderStructs();
+  renderAdvSummary(); renderBasicsSummary(); renderPhotoMode(); renderStructs(); updateBar();
   renderHousing(); renderTarget(); renderAreas(); renderView(); renderFurn(); renderLock(); renderBudget(); renumber(); $("#out").innerHTML = ""; $("#quote").hidden = true;
 }
 
 /* ---------- 이벤트 ---------- */
 document.addEventListener("click", (e) => {
-  const c = e.target.closest("button.card[data-g]");
+  const c = e.target.closest("button[data-g]");
   if (c) {
     const g = c.dataset.g, v = c.dataset.v, O = E.SIZE_OPTIONS;
     let touchSize = false;
-    if (g === "housing") { st.struct = "unknown"; st.housing = v; const h = H(); st.target = h.targets[0]; st.area = h.areas[Math.min(3, h.areas.length - 1)].id; st.custom = null; st.locked.clear(); resetSizes(); }
+    if (g === "housing") { st.chosen.housing = true; st.chosen.area = false; st.struct = "unknown"; st.housing = v; const h = H(); st.target = h.targets[0]; st.area = h.areas[Math.min(3, h.areas.length - 1)].id; st.custom = null; st.locked.clear(); resetSizes(); }
     else if (g === "target") { st.target = v; st.custom = null; st.locked.clear(); resetSizes(); }
     else if (g === "area") { st.area = v; st.custom = null; if (!st.touched) resetSizes(); }
     else if (g === "shape") { st.shape = v; st.custom = null; if (!st.touched) resetSizes(); }
@@ -395,8 +426,8 @@ document.addEventListener("click", (e) => {
   const lk = e.target.closest("#lockPlan [data-id]");
   if (lk) { const id = lk.dataset.id; st.locked.has(id) ? st.locked.delete(id) : st.locked.add(id); renderLock(); $("#out").innerHTML = ""; $("#quote").hidden = true; return; }
   const b = e.target.closest("#budget button");
-  if (b) { if (b.dataset.b === "custom") { st.customBudget = true; st.budget = Math.round(Number($("#customBudget").value) * 10000) || 0; showCustomWon(); }
-    else { st.customBudget = false; st.budget = Number(b.dataset.b); } renderBudget(); return; }
+  if (b) { st.chosen.budget = true; if (b.dataset.b === "custom") { st.customBudget = true; st.budget = Math.round(Number($("#customBudget").value) * 10000) || 0; showCustomWon(); }
+    else { st.customBudget = false; st.budget = Number(b.dataset.b); } renderBudget(); updateBar(); return; }
 });
 let camStream = null;
 let camTarget = { type: "start" };
@@ -417,13 +448,17 @@ function shot() {
   st.ownPhoto = data; st.photo = data; st.sampleId = null;
   const img = $("#preview"); img.src = st.photo; img.hidden = false; closeCam(); track("own-photo-camera");
 }
+const onArea = (e) => { const h = H(), i = Number($("#areaRange").value), a = h.areas[i]; if (!a) return;
+  st.chosen.area = true; st.area = a.id; st.custom = null; if (!st.touched) resetSizes();
+  renderAreaInfo(); renderAdvSummary(); renderBasicsSummary(); renderLock(); renderFurn(); updateBar(); $("#out").innerHTML = ""; $("#quote").hidden = true; };
+$("#areaRange").addEventListener("input", onArea); $("#areaRange").addEventListener("pointerdown", () => setTimeout(onArea, 0)); $("#areaRange").addEventListener("keydown", () => setTimeout(onArea, 0));
 $("#baRange").addEventListener("input", (e) => { const v = Number(e.target.value); $("#baBefore").style.clipPath = `inset(0 ${100 - v}% 0 0)`; $("#baLine").style.left = v + "%"; });
 const showCustomWon = () => { $("#customBudgetWon").textContent = st.budget > 0 ? `= ${won(st.budget)}` : ""; };
-$("#customBudget").addEventListener("input", (e) => { st.budget = Math.round(Number(e.target.value) * 10000) || 0; showCustomWon(); });
+$("#customBudget").addEventListener("input", (e) => { st.budget = Math.round(Number(e.target.value) * 10000) || 0; showCustomWon(); updateBar(); });
 ["#w", "#d"].forEach((s) => $(s).addEventListener("input", () => {
   const W = Number($("#w").value), D = Number($("#d").value);
-  st.custom = W >= 200 && D >= 200 ? { W, D } : null; if (!st.touched) resetSizes(); renderAreas(); renderFurn(); renderLock(); }));
-$("#clearCustom").addEventListener("click", () => { st.custom = null; $("#w").value = ""; $("#d").value = ""; if (!st.touched) resetSizes(); renderAreas(); renderFurn(); renderLock(); });
+  st.custom = W >= 200 && D >= 200 ? { W, D } : null; if (st.custom) st.chosen.area = true; if (!st.touched) resetSizes(); renderAreas(); renderFurn(); renderLock(); updateBar(); }));
+$("#clearCustom").addEventListener("click", () => { st.custom = null; $("#w").value = ""; $("#d").value = ""; if (!st.touched) resetSizes(); renderAreas(); renderFurn(); renderLock(); updateBar(); });
 $("#rental").addEventListener("change", (e) => { st.rental = e.target.checked; });
 function compress(file) {
   return new Promise((res) => { const img = new Image(), url = URL.createObjectURL(file);
@@ -455,6 +490,8 @@ const metaText = () => {
     구조: `창 ${st.view.windows.length ? st.view.windows.map((w) => E.WALLS[w]).join("·") : "없음"} / 큰 가구 ${E.BIG_WALLS[st.view.bigWall]} / 문 ${E.DOOR_POS[st.view.door]}` };
 };
 $("#go").addEventListener("click", () => {
+  const m = missing();
+  if (m.length) { const el = $(m[0][1]); el.scrollIntoView({ behavior: "smooth", block: "center" }); el.classList.add("flash"); setTimeout(() => el.classList.remove("flash"), 1300); return; }
   const r = room();
   if (!(st.budget > 0)) { alert("예산을 선택하거나 입력해주세요."); return; }
   const opts = engineOpts({ budget: st.budget, rental: st.rental });
