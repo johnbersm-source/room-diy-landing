@@ -63,6 +63,7 @@ textarea{width:100%;font:12px/1.5 ui-monospace,monospace;background:var(--bg);co
 .pin{position:absolute;transform:translate(-50%,-50%);width:26px;height:26px;border-radius:50%;background:var(--bg);border:2px solid var(--acc);color:var(--acc);font-size:12px;font-weight:700;display:flex;align-items:center;justify-content:center;pointer-events:none}
 .pin.done{background:var(--acc);color:#fff}
 .thumbfb svg{width:100%;height:84px}.thumbfb text{display:none}
+.v3row{display:grid;grid-template-columns:1fr 1fr;gap:6px}.v3{margin:8px 0}
 .afterbox{border:2px dashed var(--line);border-radius:10px;padding:14px;text-align:center;color:var(--mut);font-size:13px;margin:8px 0}
 [hidden]{display:none!important}
 #camBox{position:fixed;inset:0;background:#000;z-index:50;display:flex;flex-direction:column}
@@ -199,10 +200,14 @@ textarea{width:100%;font:12px/1.5 ui-monospace,monospace;background:var(--bg);co
   <section id="quote" hidden></section>
   <p class="mut" style="margin-top:24px">AI 이미지는 참고용이며 실제와 다를 수 있습니다. 가구 치수·간격·가격은 일반 가정값이며 실측과 판매처 가격으로 확인하세요. 상품 링크는 각 쇼핑몰의 검색 링크로, 제휴 승인 전이라 수수료가 없는 임시 링크입니다. 제휴가 시작되면 화면 상단과 견적서에 대가성 문구를 표시합니다.</p>
 </main>
-<script src="layout.js?v=1791260001"></script>
-<script src="samples.js?v=1791260001"></script>
-<script src="editor.js?v=1791260001"></script>
-<script src="board.js?v=1791260001"></script>
+<script src="layout.js?v=1791283255"></script>
+<script src="samples.js?v=1791283255"></script>
+<script src="editor.js?v=1791283255"></script>
+<script src="board.js?v=1791283255"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
+<script src="scene_logic.js?v=1791283255"></script>
+<script src="scene3d.js?v=1791283255"></script>
+<script src="views3d.js?v=1791283255"></script>
 <script src="samples.local.js" onerror="this.remove()"></script>
 <script>
 // 방문·이용 측정(기본 꺼짐). 쿠키 없이 세는 서비스(예: GoatCounter)의 주소를 넣으면 켜집니다.
@@ -512,6 +517,28 @@ async function composeBoard(photoSrc, placed) {
   if (!d.image) throw new Error(d.error || "생성에 실패했어요.");
   track("compose-ok"); return "data:image/jpeg;base64," + d.image;
 }
+// 3D 장면 이미지를 AI가 실사 사진처럼 바꾼다(서버 함수의 restyle 모드)
+async function composeRestyle(dataUrl, view) {
+  if (!COMPOSE_URL) throw new Error("AI 서버가 연결되지 않았어요.");
+  const form = new FormData(), pr = await resizeBlob(dataUrl, 768); form.append("photo", pr.b, "scene.jpg"); form.append("mode", "restyle"); form.append("view", view);
+  const r = await fetch(COMPOSE_URL, { method: "POST", body: form }), d = await r.json();
+  if (!d.image) throw new Error(d.error || "생성에 실패했어요.");
+  track("restyle-ok-" + view); return { src: "data:image/jpeg;base64," + d.image, aspect: pr.w / pr.h };
+}
+// Before와 After를 AI 실사로 나란히 만든다
+async function aiCompare(box, b, afterObjs, view) {
+  box.innerHTML = '<p class="mut">AI가 Before와 After를 실사 사진처럼 만드는 중이에요(약 30~60초)…</p>';
+  const room = { U: b.ctx.U, windows: b.ctx.windows, door: b.ctx.door };
+  try {
+    const [x, y] = await Promise.all([composeRestyle(Scene3D.snapshot(room, b.objs, view, 640, 480, true), view), composeRestyle(Scene3D.snapshot(room, afterObjs, view, 640, 480, true), view)]);
+    const fig = (r, cap) => `<figure style="margin:0;position:relative"><img src="${r.src}" alt="${cap}" style="width:100%;aspect-ratio:${r.aspect};object-fit:fill;border-radius:8px;display:block"><span style="position:absolute;right:6px;top:6px;background:rgba(0,0,0,.55);color:#fff;border-radius:6px;padding:1px 6px;font-size:11px">✦ AI</span><figcaption class="mut" style="font-size:12px;text-align:center">${cap}</figcaption></figure>`;
+    box.innerHTML = `<div class="v3row">${fig(x, "Before · AI 실사")}${fig(y, "After · AI 실사")}</div><p class="mut" style="font-size:12px">AI가 만든 예시예요. 실제 제품·방과 다를 수 있어요.</p>`;
+  } catch (e) { box.innerHTML = `<p class="mut">${esc(e.message)} 잠시 후 다시 시도해주세요.</p>`; }
+}
+function openScene(objs, b, onSave) {
+  Scene3D.openEditor({ room: { U: b.ctx.U, windows: b.ctx.windows, door: b.ctx.door }, objs: JSON.parse(JSON.stringify(objs)), names: itemNames(), addable: Views3D.ROOM_ADD[st.target] || [],
+    compose: COMPOSE_URL ? composeRestyle : null, onSave });
+}
 function openBoard(c, photoSrc, pins, onSave, keys) {
   Board.open({ photo: photoSrc, names: itemNames(), items: (keys || c.purchase.inBudget.map((i) => i.key)).filter((k) => Board.SLOT[k]), pins: pins || {}, onSave,
     compose: COMPOSE_URL ? (placed) => composeBoard(photoSrc, placed) : null });
@@ -555,11 +582,12 @@ $("#go").addEventListener("click", () => {
     // 방 종류별 적정 품목 수(가정): 거실은 면적/3(3~8), 안방·작은방은 면적/3.5(3~6), 원룸은 면적/3(3~7)
     nFair = st.target === "living" ? Math.min(8, Math.max(3, Math.round(areaM2 / 3))) : st.target === "room" ? Math.min(7, Math.max(3, Math.round(areaM2 / 3))) : Math.min(6, Math.max(3, Math.round(areaM2 / 3.5)));
   const fairOf = (c) => { const full = E.planPurchase(c.items, null).inBudget, all = full.slice(0, nFair), min3 = full.slice(0, 3).reduce((t, i) => t + i.mid, 0); return { min3, n: all.length, lo: all.reduce((t, i) => t + i.price[0], 0), hi: all.reduce((t, i) => t + i.price[1], 0), mid: all.reduce((t, i) => t + i.mid, 0) }; };
+  const B3 = Views3D.ok() ? Views3D.before(r, opts, itemNames()) : null; LAST.B3 = B3; LAST.v3 = {};
   const names = Object.fromEntries(E.currentScene(r, engineOpts()).pieces.map((p) => [p.id, p.label]));
   const lockNote = st.locked.size ? `<p class="mut">이동 불가: ${[...st.locked].map((id) => esc(names[id] || id)).join(", ")}</p>` : "";
   $("#out").innerHTML = `<h2>추천 (${esc(H().label)} ${esc(E.TARGETS[st.target].label)} · ${r.W}×${r.D}cm · 예산 ${won(st.budget)})</h2>
     <p class="mut">현재 배치는 일반적인 구성으로 가정했어요. 실제와 다르면 위에서 가구 크기와 구조를 바꿔보세요.</p>${lockNote}
-    ${st.photo ? `<p class="mut">${st.sampleId ? "예시 방 (Before)" : "내 방 (Before)"}</p><img src="${st.photo}" alt="내 방 사진" style="max-width:100%;border-radius:10px">` : ""}` +
+    ${st.photo && !st.sampleId ? `<p class="mut">내 방 사진</p><img src="${st.photo}" alt="내 방 사진" style="max-width:100%;border-radius:10px">` : ""}` +
     (E.anyApplicable(cs) ? "" : `<p class="mut"><b>이동 불가로 지정한 가구 때문에 적용할 수 있는 안이 없어요.</b> 일부를 해제해보세요.</p>`) +
     (cs.some((c) => !c.blocked && c.purchase.total === 0 && c.score === best) && cs.some((c) => !c.blocked && c.items.length) ? `<p class="mut">💡 돈이 안 드는 재배치(B)부터 해보고, 분위기를 더 바꾸고 싶으면 A·C의 소품을 더하는 순서가 좋아요.</p>` : "") +
     [...cs].sort((a, b) => (REC[b.id] || 0) - (REC[a.id] || 0) || (a.blocked - b.blocked)).map((c) => {
@@ -567,7 +595,7 @@ $("#go").addEventListener("click", () => {
       reg(p.inBudget.concat(p.over));
       const buy = c.items.length
         ? `<div class="buy"><b>구매 리스트</b> <span class="mut">합계 ${won(p.total)} / 예산 ${won(st.budget)}</span>
-            ${Editor.preview(p.inBudget, { family: c.family })}
+            ${B3 ? "" : Editor.preview(p.inBudget, { family: c.family })}
             ${p.inBudget.map((i) => itemHtml(i, false)).join("")}
             ${p.over.length ? `<p class="mut">예산 초과로 제외: ${p.over.map((i) => esc(i.name)).join(", ")}</p>` : ""}
             ${Editor.more(p, st.budget, "data-raise")}
@@ -577,10 +605,10 @@ $("#go").addEventListener("click", () => {
       const lv = REC[c.id] || 0, fair = p.max > 0 && !c.blocked ? (() => { const f = fairOf(c); return `<div class="fair">이 방(${esc(rr.W + "×" + rr.D + "cm")})에는 우선순위 ${f.n}가지를 <b>약 ${won(Math.round(f.mid / 1000) * 1000)}</b>(${won(Math.round(f.lo / 1000) * 1000)}~${won(Math.round(f.hi / 1000) * 1000)})이 적정해요${f.n > 3 ? ` · 꼭 필요한 3가지만이면 약 ${won(Math.round(f.min3 / 1000) * 1000)}` : ""}${st.budget >= f.mid ? "" : ` · 예산 ${won(st.budget)}으로는 일부만`}</div>`; })() : "";
       return `<div class="cand${c.blocked ? " blocked" : ""}"><h3>${c.id}. ${esc(c.title)}${c.blocked ? '<span class="score">적용 불가</span>' : lv === 2 ? '<span class="rec rec2">매우 추천</span>' : lv === 1 ? '<span class="rec rec1">추천</span>' : ""}</h3>${fair}
         <div class="mut">${esc(c.cost)}</div>
-        ${E.svg(r, c, { locked: [...st.locked] })}
+        ${B3 && !c.blocked ? (() => { const ao = Views3D.after(c, B3, c.purchase.inBudget.map((i) => i.key), itemNames()); LAST.v3[c.id] = ao; return Views3D.pairHtml(B3, ao, B3.ctx); })() : E.svg(r, c, { locked: [...st.locked] })}
         <ul class="chk">${c.checks.map((k) => `<li class="${k.level}">${esc(k.msg)}</li>`).join("")}</ul>
         ${c.blocked ? `<button class="cta ghost" type="button" data-unlock="${esc((c.blockedBy || []).join(","))}">${esc((c.blockedBy || []).map((id) => names[id] || id).join(", "))} 이동 불가를 해제하고 다시 보기</button>` : buy}
-        ${c.blocked ? "" : `<button class="cta" type="button" data-board="${c.id}">사진 위에 끌어서 꾸며보기</button><button class="cta ghost" type="button" data-edit="${c.id}">도면에서 가구 배치해보기</button><button class="cta ghost" type="button" data-save="${c.id}">견적서 받기 (앱에 보관)</button>`}
+        ${c.blocked ? "" : `${B3 ? `<button class="cta" type="button" data-s3edit="${c.id}">입체로 끌어서 꾸며보기</button>${COMPOSE_URL ? `<div class="row seg"><button type="button" data-aicmp="front:${c.id}">AI 실사로 비교(정면)</button><button type="button" data-aicmp="top:${c.id}">AI 실사로 비교(위에서)</button></div><div id="aicmp-${c.id}"></div>` : ""}` : `<button class="cta ghost" type="button" data-edit="${c.id}">도면에서 가구 배치해보기</button>`}${st.photo && !st.sampleId ? `<button class="cta ghost" type="button" data-board="${c.id}">내 사진 위에 놓아보기</button>` : ""}<button class="cta ghost" type="button" data-save="${c.id}">견적서 받기 (앱에 보관)</button>`}
         <details><summary>AI 이미지에 넣을 지시문</summary><textarea readonly rows="6">${esc(c.prompt)}</textarea></details></div>`;
     }).join("");
   $("#quote").hidden = true;
@@ -613,6 +641,7 @@ function saveAndOpen(candId, layout, extra) {
   if (extra && extra.sampleId) { rec.sampleId = extra.sampleId; rec.pins = {}; }
   if (extra && extra.pins) rec.pins = extra.pins;
   if (extra && extra.board) rec.board = extra.board;
+  if (extra && extra.scene) rec.scene = extra.scene;
   const all = loadQ(); all.unshift(rec); saveQ(all);
   if (!st.sampleId && st.photo && !savePhoto(rec.id, st.photo)) alert("사진 저장 공간이 부족해 사진 없이 저장했어요. 견적서 안에서 사진을 다시 추가할 수 있어요.");
   track("quote-saved"); openQuote(rec.id);
@@ -681,7 +710,7 @@ function renderQuote(rec) {
     <h3>진행 상황 <span class="mut">${done.size}/${total}개 준비</span></h3><div class="bar"><i style="width:${total ? Math.round(done.size / total * 100) : 0}%"></i></div>
     <table>${Object.entries(meta).map(([k, v]) => `<tr><th>${esc(k)}</th><td colspan="2">${esc(v)}</td></tr>`).join("")}<tr><th>추천 안</th><td colspan="2">${esc(q.plan)} (${esc(q.cost)})</td></tr></table>
     <h3>내 방 사진에서 보는 진행 상황</h3>${photoPanel(rec, c, done)}
-    <h3>구매 품목을 적용한 모습</h3>${ph0 ? `<button class="cta" type="button" data-qboard="1">사진 위에 끌어서 꾸며보기</button>` : ""}${COMPOSE_URL && ph0 ? `<button class="cta ghost" type="button" data-compose="1">AI로 내 방에 적용해 보기 (무료 체험)</button><div id="composeOut"></div>` : ""}${Editor.preview(c.purchase.inBudget, { family: c.family, photo: ph0, pins: rec.pins && Object.keys(rec.pins).length ? rec.pins : null })}
+    <h3>구매 품목을 적용한 모습</h3>${Views3D.ok() ? (() => { try { const b3 = Views3D.before(r, opts, itemNames()), ao = rec.scene || Views3D.after(c, b3, c.purchase.inBudget.map((i) => i.key), itemNames()); return Views3D.pairHtml(b3, ao, b3.ctx) + `<button class="cta" type="button" data-qs3="1">입체로 끌어서 꾸며보기</button>${COMPOSE_URL ? `<div class="row seg"><button type="button" data-qaicmp="front">AI 실사로 비교(정면)</button><button type="button" data-qaicmp="top">AI 실사로 비교(위에서)</button></div><div id="qaicmp"></div>` : ""}`; } catch (e) { return ""; } })() : ""}${ph0 ? `<button class="cta" type="button" data-qboard="1">사진 위에 끌어서 꾸며보기</button>` : ""}${COMPOSE_URL && ph0 ? `<button class="cta ghost" type="button" data-compose="1">AI로 내 방에 적용해 보기 (무료 체험)</button><div id="composeOut"></div>` : ""}${Views3D.ok() && !(ph0 && rec.pins && Object.keys(rec.pins).length) ? "" : Editor.preview(c.purchase.inBudget, { family: c.family, photo: ph0, pins: rec.pins && Object.keys(rec.pins).length ? rec.pins : null })}
     <details><summary>${rec.layout ? "내가 직접 배치한 도면" : "참고 배치도(도면 보기)"}</summary>${E.svg(r, rec.layout ? Object.assign({}, c, { pieces: rec.layout }) : c, { locked: rec.st.locked })}</details>
     <h3>이렇게 바꿔요</h3><ol>${q.changes.map((x) => `<li>${esc(x)}</li>`).join("")}</ol>
     ${q.phases.length ? q.phases.map((p) => `<h3>${esc(p.title)} <span class="mut">소계 약 ${won(p.subtotal)}</span></h3>
@@ -740,6 +769,17 @@ document.addEventListener("click", (e) => {
   if (e.target.closest("[data-compose]")) { const rec = loadQ().find((q) => q.id === curQuoteId()); if (rec) { const { cs } = restore(rec), c = cs.find((x) => x.id === rec.candId), sm = rec.sampleId ? sampleOf(rec.sampleId) : null; composeNow(rec, c, sm ? sm.img : photoOf(rec.id)); } return; }
   const vw = e.target.closest("[data-view]"); if (vw && REG[vw.dataset.view]) { Editor.showItem(REG[vw.dataset.view]); return; }
   const rz = e.target.closest("[data-raise]"); if (rz) { st.budget = Number(rz.dataset.raise); st.customBudget = !BUDGETS.includes(st.budget / 10000); st.chosen.budget = true; renderBudget(); track("budget-raised"); $("#go").click(); return; }
+  const s3 = e.target.closest("[data-s3edit]");
+  if (s3 && LAST && LAST.B3) { const c = LAST.cs.find((x) => x.id === s3.dataset.s3edit); if (c && LAST.v3[c.id]) openScene(LAST.v3[c.id], LAST.B3, (objs) => saveAndOpen(c.id, null, { scene: objs, board: Views3D.keysOf(objs) })); return; }
+  const ac = e.target.closest("[data-aicmp]");
+  if (ac && LAST && LAST.B3) { const [view, id] = ac.dataset.aicmp.split(":"); if (LAST.v3[id]) aiCompare($("#aicmp-" + id), LAST.B3, LAST.v3[id], view); return; }
+  const qac = e.target.closest("[data-qaicmp]");
+  if (qac) { const rec = loadQ().find((q) => q.id === curQuoteId()); if (rec) { const { r, opts, cs } = restore(rec), c = cs.find((x) => x.id === rec.candId), b = Views3D.before(r, opts, itemNames());
+    const keys = rec.board && rec.board.length ? rec.board : c.purchase.inBudget.map((i) => i.key); aiCompare($("#qaicmp"), b, rec.scene || Views3D.after(c, b, keys, itemNames()), qac.dataset.qaicmp); } return; }
+  const qs3 = e.target.closest("[data-qs3]");
+  if (qs3) { const all = loadQ(), rec = all.find((q) => q.id === curQuoteId()); if (rec) { const { r, opts, cs } = restore(rec), c = cs.find((x) => x.id === rec.candId), b = Views3D.before(r, opts, itemNames());
+    const keys = rec.board && rec.board.length ? rec.board : c.purchase.inBudget.map((i) => i.key), objs = rec.scene || Views3D.after(c, b, keys, itemNames());
+    openScene(objs, b, (o2) => { rec.scene = o2; rec.board = Views3D.keysOf(o2); saveQ(all); renderQuote(rec); }); return; } }
   const bd = e.target.closest("[data-board]");
   if (bd && LAST) { const c = LAST.cs.find((x) => x.id === bd.dataset.board); if (c) {
     const ex = samplesFor(st.housing, st.target).find((x) => x.img), sm = st.sampleId ? sampleOf(st.sampleId) : null;

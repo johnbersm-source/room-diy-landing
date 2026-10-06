@@ -192,6 +192,7 @@
   };
   const LIVING_EXTRAS = ["curtain", "cushion", "moodLamp", "plant", "sidetable", "ottoman", "frame", "lightSet", "cabinet"];
   const BED_EXTRAS = ["bedding", "curtain", "mirror", "moodLamp", "plant", "lightSet", "cabinet"];
+  const ITEM_BAN = { master: ["shelf", "hanger", "bookcase"], living: ["shelf", "hanger", "deskLamp", "desk", "bookcase"] };
   const RENTAL_SENSITIVE = ["shelf", "hanger", "bookcase", "curtain", "frame"];
   const mkItem = (key) => {
     const it = ITEM[key];
@@ -278,10 +279,14 @@
   }
   const centerOf = (r) => ({ x: r.x + r.w / 2, y: r.y + r.h / 2 });
 
-  function freeLeft(p, solids) { let g = p.x; solids.forEach((s) => { if (s !== p && yOver(p, s) && s.x + s.w <= p.x) g = Math.min(g, p.x - (s.x + s.w)); }); return g; }
-  function freeRight(p, solids, W) { let g = W - (p.x + p.w); solids.forEach((s) => { if (s !== p && yOver(p, s) && s.x >= p.x + p.w) g = Math.min(g, s.x - (p.x + p.w)); }); return g; }
-  function freeDown(p, solids, D) { let g = D - (p.y + p.h); solids.forEach((s) => { if (s !== p && xOver(p, s) && s.y >= p.y + p.h) g = Math.min(g, s.y - (p.y + p.h)); }); return g; }
-  function freeUp(p, solids) { let g = p.y; solids.forEach((s) => { if (s !== p && xOver(p, s) && s.y + s.h <= p.y) g = Math.min(g, p.y - (s.y + s.h)); }); return g; }
+  // 모서리가 살짝(15cm 미만) 겹치는 정도는 앞 여유 계산에서 무시한다
+  const TOL = 15;
+  const yOverT = (a, b) => a.y + TOL < b.y + b.h && b.y + TOL < a.y + a.h;
+  const xOverT = (a, b) => a.x + TOL < b.x + b.w && b.x + TOL < a.x + a.w;
+  function freeLeft(p, solids) { let g = p.x; solids.forEach((s) => { if (s !== p && yOverT(p, s) && s.x + s.w <= p.x) g = Math.min(g, p.x - (s.x + s.w)); }); return g; }
+  function freeRight(p, solids, W) { let g = W - (p.x + p.w); solids.forEach((s) => { if (s !== p && yOverT(p, s) && s.x >= p.x + p.w) g = Math.min(g, s.x - (p.x + p.w)); }); return g; }
+  function freeDown(p, solids, D) { let g = D - (p.y + p.h); solids.forEach((s) => { if (s !== p && xOverT(p, s) && s.y >= p.y + p.h) g = Math.min(g, s.y - (p.y + p.h)); }); return g; }
+  function freeUp(p, solids) { let g = p.y; solids.forEach((s) => { if (s !== p && xOverT(p, s) && s.y + s.h <= p.y) g = Math.min(g, p.y - (s.y + s.h)); }); return g; }
   // 가구 앞(가장 가까운 벽의 반대쪽) 여유
   function frontClear(p, solids, Uc) {
     const d = [p.x, Uc.W - (p.x + p.w), p.y, Uc.D - (p.y + p.h)];
@@ -387,10 +392,53 @@
     return base;
   }
 
+  // 침대 계열 추가 점검(침대 옆 통로·발치·옷장 앞·책상 앞)
+  function bedExtra(pieces, Uc) {
+    const { W, D } = Uc, by = Object.fromEntries(pieces.map((p) => [p.id, p])), solids = solidsOf(pieces), out = [];
+    const bd = by.bed, probe = R("probe", "", bd.x, bd.y + bd.h / 2, bd.w, bd.h / 2);
+    const open = Math.max(freeLeft(probe, solids), freeRight(probe, solids, W));
+    out.push(lvl(open, 40, 60, `침대 옆 통로 ${Math.round(open)}cm`, `침대 옆 통로 ${Math.round(open)}cm (최소 40cm 필요)`, `침대 옆 통로 ${Math.round(open)}cm (60cm 이상 권장)`));
+    const footSolids = solids.filter((x) => x.id !== "bookcase"), halfW = bd.w / 2;
+    const foot = Math.max(freeDown(R("f1", "", bd.x, bd.y, halfW, bd.h), footSolids, D), freeDown(R("f2", "", bd.x + halfW, bd.y, halfW, bd.h), footSolids, D));
+    if (foot < 60) out.push({ level: "warn", msg: `침대 발치 여유 ${Math.round(foot)}cm (60cm 이상 권장)` });
+    const w = by.ward;
+    if (w) { const f = frontClear(w, solids, Uc); out.push(lvl(f, 60, 80, `옷장 앞 여유 ${Math.round(f)}cm`, `옷장 앞 여유 ${Math.round(f)}cm (문 열림 최소 60cm 필요)`, `옷장 앞 여유 ${Math.round(f)}cm (80cm 이상 권장)`)); }
+    const dk = by.desk;
+    if (dk) { const f = frontClear(dk, solids, Uc); out.push(lvl(f, 70, 90, `책상 앞 의자 공간 ${Math.round(f)}cm`, `책상 앞 의자 공간 ${Math.round(f)}cm (최소 70cm 필요)`, `책상 앞 의자 공간 ${Math.round(f)}cm (90cm 이상 권장)`)); }
+    return out;
+  }
+
+  // 책상 없는 방: 침대·옷장 위치를 여러 후보에서 찾아 문 열림 공간·통로 문제가 없는 배치를 고른다
+  function bestBedLayout(Uc, regions, sz, fixed, baseBed, baseWard) {
+    const { W, D } = Uc, bw = S(sz.bed), bl = S(200), wl = S(sz.ward), wd = S(55);
+    const ri = (v) => Math.round(v / 5) * 5;
+    const beds = [];
+    [0, ri((W - bw) / 2), W - bw].forEach((x) => beds.push(R("bed", "침대", x, 0, bw, bl)));          // 머리를 맞은편 벽에 (세로)
+    [0, ri((D - bw) / 2), D - bw].forEach((y) => { beds.push(R("bed", "침대", 0, y, bl, bw)); beds.push(R("bed", "침대", W - bl, y, bl, bw)); }); // 머리를 옆 벽에 (가로)
+    const wards = [baseWard, R("ward", "옷장", W - wd, 10, wd, wl), R("ward", "옷장", W - wd, D - wl - 10, wd, wl), R("ward", "옷장", 0, D - wl - 10, wd, wl),
+      R("ward", "옷장", 0, 10, wd, wl), R("ward", "옷장", W - wl - 10, 0, wl, wd), R("ward", "옷장", 10, 0, wl, wd), R("ward", "옷장", 10, D - wd, wl, wd), R("ward", "옷장", W - wl - 10, D - wd, wl, wd)];
+    let best = null;
+    beds.forEach((bed) => wards.forEach((ward) => {
+      const ps = [bed, ward, ...fixed];
+      const ck = [...basicChecks(ps, Uc, regions), ...bedExtra(ps, Uc)];
+      const errs = ck.filter((k) => k.level === "error").length, warns = ck.filter((k) => k.level === "warn").length;
+      const solids = solidsOf(ps), probe = R("probe", "", bed.x, bed.y + bed.h / 2, bed.w, bed.h / 2);
+      const sides = Math.min(60, freeLeft(probe, solids), freeRight(probe, solids, W));
+      const moved = Math.abs(bed.x - baseBed.x) + Math.abs(bed.y - baseBed.y) + Math.abs(ward.x - baseWard.x) + Math.abs(ward.y - baseWard.y);
+      const val = -errs * 1000 - warns * 100 + sides * 0.5 - moved * 0.05;
+      if (!best || val > best.val) best = { bed, ward, val, errs };
+    }));
+    return best;
+  }
+
   function bedCandidates(Uc, regions, winC, sz, hasDesk, fixed, avoid) {
     const { W, D } = Uc;
     const b = bedBase(Uc, sz, hasDesk, avoid);
-    const { bed, ward, desk } = b;
+    let { bed, ward, desk } = b;
+    if (!hasDesk) { // 기본 배치가 문 열림 공간·옷장 앞 여유 등에서 오류가 나면, 오류 없는 가장 가까운 배치를 기준으로 삼는다
+      const ck0 = [...basicChecks([bed, ward, ...fixed], Uc, avoid), ...bedExtra([bed, ward, ...fixed], Uc)];
+      if (ck0.some((k) => k.level === "error")) { const bb = bestBedLayout(Uc, avoid, sz, fixed, bed, ward); if (!bb.errs) { bed = bb.bed; ward = bb.ward; b.bed = bed; b.ward = ward; } }
+    }
     const base = (hasDesk ? [bed, ward, desk] : [bed, ward]).concat(fixed);
     const pref = winC.length ? centerOf(winC[0].rect) : { x: W / 2, y: 12 };
     const nsz = S(40);
@@ -425,9 +473,11 @@
         changes: ["책상을 창 가까이로 옮겨 자연광을 쓰도록 배치", "옷장 위치를 조정해 책상 앞 의자 공간(90cm 이상)을 확보", "기존 책상 자리는 비워 통로로 사용"],
         items: [], extraChecks: chosen ? [] : [{ level: "warn", msg: "의자 공간 90cm를 확보하는 책상 자리를 찾지 못해 가장 가까운 자리로 표시" }] });
     } else {
-      const b2 = R("bed", "침대", Math.round((W - S(sz.bed)) / 2), 0, S(sz.bed), S(200));
-      list.push({ id: "B", title: "재배치 0원형", cost: "0원 (기존 가구 이동)", pieces: [b2, ward, ...fixed],
-        changes: ["침대를 한쪽 벽 중앙으로 옮겨 양쪽에서 오르내릴 수 있게 배치", "옷장 앞 여유 공간(80cm)을 확보"], items: [], extraChecks: [] });
+      const bb = bestBedLayout(Uc, avoid, sz, fixed, bed, ward);
+      const same = Math.abs(bb.bed.x - bed.x) + Math.abs(bb.bed.y - bed.y) + Math.abs(bb.ward.x - ward.x) + Math.abs(bb.ward.y - ward.y) < 1;
+      list.push({ id: "B", title: "재배치 0원형", cost: "0원 (기존 가구 이동)", pieces: [bb.bed, bb.ward, ...fixed],
+        changes: same ? ["지금 배치가 이 방에서는 가장 무난해요(문 열림 공간과 통로를 이미 확보)"] : ["침대와 옷장 위치를 조정해 문 열림 공간과 침대 옆 통로를 확보", "옷장 앞 여유 공간(60cm 이상)을 확보"],
+        items: [], extraChecks: bb.errs ? [{ level: "warn", msg: "방이 좁아 모든 조건을 만족하는 재배치를 찾지 못했어요" }] : [] });
     }
     if (hasDesk) {
       const shelf = R("bookcase", "낮은 책장", 0, bed.y + bed.h + 5, S(80), S(30));
@@ -444,21 +494,7 @@
         extraChecks: found ? [] : [{ level: "error", msg: "소형 책상을 놓을 자리가 없음" }] });
     }
     list.forEach((c) => {
-      const by = Object.fromEntries(c.pieces.map((p) => [p.id, p]));
-      const solids = solidsOf(c.pieces);
-      c.checks = [...basicChecks(c.pieces, Uc, regions), ...c.extraChecks];
-      const bd = by.bed;
-      const probe = R("probe", "", bd.x, bd.y + bd.h / 2, bd.w, bd.h / 2);
-      const open = Math.max(freeLeft(probe, solids), freeRight(probe, solids, W));
-      c.checks.push(lvl(open, 40, 60, `침대 옆 통로 ${Math.round(open)}cm`, `침대 옆 통로 ${Math.round(open)}cm (최소 40cm 필요)`, `침대 옆 통로 ${Math.round(open)}cm (60cm 이상 권장)`));
-      const footSolids = solids.filter((x) => x.id !== "bookcase");
-      const halfW = bd.w / 2;
-      const foot = Math.max(freeDown(R("f1", "", bd.x, bd.y, halfW, bd.h), footSolids, D), freeDown(R("f2", "", bd.x + halfW, bd.y, halfW, bd.h), footSolids, D));
-      if (foot < 60) c.checks.push({ level: "warn", msg: `침대 발치 여유 ${Math.round(foot)}cm (60cm 이상 권장)` });
-      const w = by.ward;
-      if (w) { const f = frontClear(w, solids, Uc); c.checks.push(lvl(f, 60, 80, `옷장 앞 여유 ${Math.round(f)}cm`, `옷장 앞 여유 ${Math.round(f)}cm (문 열림 최소 60cm 필요)`, `옷장 앞 여유 ${Math.round(f)}cm (80cm 이상 권장)`)); }
-      const dk = by.desk;
-      if (dk) { const f = frontClear(dk, solids, Uc); c.checks.push(lvl(f, 70, 90, `책상 앞 의자 공간 ${Math.round(f)}cm`, `책상 앞 의자 공간 ${Math.round(f)}cm (최소 70cm 필요)`, `책상 앞 의자 공간 ${Math.round(f)}cm (90cm 이상 권장)`)); }
+      c.checks = [...basicChecks(c.pieces, Uc, regions), ...c.extraChecks, ...bedExtra(c.pieces, Uc)];
     });
     return { list, base: b };
   }
@@ -530,6 +566,8 @@
     const built = ctx.family === "living" ? livingCandidates(ctx.Uc, ctx.regions, ctx.winC, opts.sizes, ctx.fixed, ctx.avoid) : bedCandidates(ctx.Uc, ctx.regions, ctx.winC, opts.sizes, ctx.hasDesk, ctx.fixed, ctx.avoid);
     const locked = new Set(opts.locked || []);
     built.list.forEach((c) => {
+      // 방 종류에 맞지 않는 품목은 뺀다(예: 안방에 무타공 선반·문걸이는 보통 쓰지 않는다)
+      const ban = ITEM_BAN[ctx.target] || []; c.items = c.items.filter((k) => !ban.includes(k));
       c.blocked = false; c.blockedBy = [];
       Object.values(built.base).forEach((bp) => {
         if (!bp || !bp.id || !locked.has(bp.id)) return;
