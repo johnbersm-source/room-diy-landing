@@ -82,6 +82,11 @@ textarea{width:100%;font:12px/1.5 ui-monospace,monospace;background:var(--bg);co
 .start{background:var(--card);border:2px solid var(--line);border-radius:14px;padding:12px;text-align:left;cursor:pointer;font:inherit;color:inherit}
 .start b{display:block;font-size:15px;margin-bottom:2px}.start small{color:var(--mut);font-size:12px;line-height:1.4;display:block}
 .start.pri{border-color:var(--acc)}
+.sizes{display:grid;grid-template-columns:repeat(2,1fr);gap:8px}.sizes .card{padding:12px 6px;background:var(--bg);border:1px solid var(--line)}.sizes .card[aria-pressed=true]{border:2px solid var(--acc);background:var(--selbg)}.sizes .card:last-child{grid-column:1/-1}.sizes .card b{display:block;font-size:15px}.sizes .card small{display:block;color:var(--mut);margin-top:2px}
+.frow{display:flex;align-items:center;gap:8px;margin:8px 0}.frow>b{min-width:54px;font-size:14px}.frow .fs{display:flex;gap:6px;overflow-x:auto;flex:1;padding:2px}
+.fb{white-space:nowrap;padding:8px 11px;border:1px solid var(--line);background:var(--card);border-radius:10px;font:inherit;font-size:13px;color:inherit;cursor:pointer}
+.fb[aria-pressed=true]{border-color:var(--acc);background:var(--selbg);color:var(--acc);font-weight:700}
+.fb.none{padding:6px 9px;font-size:12px;color:var(--mut);border-style:dashed;align-self:center}
 .segs{display:grid;gap:1px;background:var(--line);border:1px solid var(--line);border-radius:12px;overflow:hidden}
 .segs.c2{grid-template-columns:repeat(2,1fr)}.segs.c3{grid-template-columns:repeat(3,1fr)}
 .segs button{background:var(--bg);border:0;padding:15px 6px;min-height:52px;font:inherit;font-size:15px;color:inherit;cursor:pointer}
@@ -122,12 +127,13 @@ textarea{width:100%;font:12px/1.5 ui-monospace,monospace;background:var(--bg);co
     <h1>내 방에 맞는 셀프 인테리어,<br>돈 안 드는 재배치부터</h1>
     <p class="mut">방 크기와 구조만 고르면 가구가 들어가는지 계산하고, 직접 할 수 있는 소품과 구매 리스트를 알려드려요. 업체 연결은 없어요.</p>
     <div class="bas" id="ba">
-      <img src="samples/living1_after.webp" alt="After 예시(AI 생성)">
-      <img src="samples/living1.jpg" alt="Before 예시" id="baBefore" style="clip-path:inset(0 50% 0 0)">
+      <img src="samples/hero_after.jpg" alt="After 예시" id="baAfter">
+      <img src="samples/hero_before.jpg" alt="Before 예시" id="baBefore" style="clip-path:inset(0 50% 0 0)">
       <div class="baLine" id="baLine" style="left:50%"></div>
-      <span class="baTag" style="left:8px">Before</span><span class="baTag" style="right:8px">After (AI 생성 예시)</span>
+      <span class="baTag" style="left:8px">Before</span><span class="baTag" style="right:8px">After</span>
       <input type="range" id="baRange" min="0" max="100" value="50" aria-label="Before After 비교 슬라이더">
     </div>
+    <div class="segs c2" id="heroMode" style="margin-bottom:10px"><button type="button" data-hero="photo" aria-pressed="true">실사로 보기</button><button type="button" data-hero="3d" aria-pressed="false">3D로 보기</button></div>
     <div class="starts">
       <button type="button" class="start pri" data-start="sample"><b>⚡ 예시 방으로 1분 체험</b><small>사진 없이, 우리 집과 비슷한 방을 골라 바로 결과 보기</small></button>
       <button type="button" class="start" data-start="own"><b>📷 내 방으로 정확하게</b><small>사진을 찍고 내 방에서 놓을 자리를 표시해요</small></button>
@@ -136,14 +142,9 @@ textarea{width:100%;font:12px/1.5 ui-monospace,monospace;background:var(--bg);co
   </section>
 
   <details id="basics" class="adv" open>
-    <summary id="basicsSummary">우리 집 선택</summary>
-    <div class="grp" id="gHousing"><h3 class="gt">집 종류 <i class="req">필수</i></h3><div class="segs c3" id="housing"></div><p class="mut" id="housingDesc"></p></div>
-    <div class="grp" id="targetBox"><h3 class="gt">꾸밀 방</h3><div class="segs c3" id="target"></div><p class="mut" id="targetDesc"></p></div>
-    <div class="grp" id="gArea"><h3 class="gt" id="areaTitle">평형 <i class="req">필수</i></h3>
-      <input type="range" class="slider" id="areaRange" min="0" max="6" step="1" value="0" aria-label="평형 선택">
-      <div class="ticks"><span id="tickMin"></span><span id="tickMax"></span></div>
-      <p class="info unset" id="areaInfo"></p></div>
-    <div class="grp" id="structBox" hidden><h3 class="gt">방 개수</h3><div class="segs c3" id="roomsSel"></div><h3 class="gt" style="margin-top:12px">화장실 개수</h3><div class="segs c3" id="bathsSel"></div><p class="mut" id="planDesc"></p><h3 class="gt" style="margin-top:12px">우리 집 구조</h3><div class="segs c2" id="structs"></div><p class="mut" id="structDesc"></p></div>
+    <summary id="basicsSummary">방 선택</summary>
+    <div class="grp" id="gTarget"><h3 class="gt">꾸밀 방 <i class="req">필수</i></h3><div class="segs c3" id="target"></div><p class="mut" id="targetDesc"></p></div>
+    <div class="grp" id="gSize"><h3 class="gt">방 크기 <i class="req">필수</i></h3><div class="sizes" id="sizes"></div><p class="mut" id="sizeInfo"></p></div>
     <div class="grp"><h3 class="gt">방 모양</h3><div class="segs c2" id="shapes"></div></div>
     <details style="margin-top:12px"><summary>줄자로 방 크기를 직접 입력하기 (선택)</summary>
       <div class="row">가로 <input id="w" type="number" min="200" max="700" step="10"> cm
@@ -165,7 +166,7 @@ textarea{width:100%;font:12px/1.5 ui-monospace,monospace;background:var(--bg);co
     <h3 style="margin-top:18px">옮기기 어려운 가구를 눌러주세요</h3>
     <p class="mut">붙박이장, 무거운 가구, 콘센트 때문에 못 옮기는 가구를 누르면 색이 바뀌고(🔒) 그 가구는 옮기지 않는 안만 추천해요. 다시 누르면 해제됩니다.</p>
     <div class="plan" id="lockPlan"></div>
-    <p class="mut legend"><i style="background:var(--lock)"></i>이동 불가 <i style="background:var(--card)"></i>이동 가능</p>
+    <p class="mut legend"><i style="background:#e03131;opacity:.5"></i>🔒 이동 불가(빨간색) · 누르면 해제돼요. 문 위치를 바꾸면 나머지 가구는 겹치지 않게 자동으로 옮겨져요.</p>
   </details>
 
   <div class="grp"><h3 class="gt">방 사진 <small>(선택)</small></h3>
@@ -200,14 +201,14 @@ textarea{width:100%;font:12px/1.5 ui-monospace,monospace;background:var(--bg);co
   <section id="quote" hidden></section>
   <p class="mut" style="margin-top:24px">AI 이미지는 참고용이며 실제와 다를 수 있습니다. 가구 치수·간격·가격은 일반 가정값이며 실측과 판매처 가격으로 확인하세요. 상품 링크는 각 쇼핑몰의 검색 링크로, 제휴 승인 전이라 수수료가 없는 임시 링크입니다. 제휴가 시작되면 화면 상단과 견적서에 대가성 문구를 표시합니다.</p>
 </main>
-<script src="layout.js?v=1791568446"></script>
-<script src="samples.js?v=1791568446"></script>
-<script src="editor.js?v=1791568446"></script>
-<script src="board.js?v=1791568446"></script>
+<script src="layout.js?v=1791702923"></script>
+<script src="samples.js?v=1791702923"></script>
+<script src="editor.js?v=1791702923"></script>
+<script src="board.js?v=1791702923"></script>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
-<script src="scene_logic.js?v=1791568446"></script>
-<script src="scene3d.js?v=1791568446"></script>
-<script src="views3d.js?v=1791568446"></script>
+<script src="scene_logic.js?v=1791702923"></script>
+<script src="scene3d.js?v=1791702923"></script>
+<script src="views3d.js?v=1791702923"></script>
 <script src="samples.local.js" onerror="this.remove()"></script>
 <script>
 // 방문·이용 측정(기본 꺼짐). 쿠키 없이 세는 서비스(예: GoatCounter)의 주소를 넣으면 켜집니다.
@@ -222,24 +223,15 @@ const esc = (s) => String(s).replace(/[&<>"]/g, (c) => ({ "&": "&amp;", "<": "&l
 const won = (n) => n.toLocaleString("ko-KR") + "원";
 const BUDGETS = [5, 15, 30, 50, 100];
 
-const st = { chosen: { housing: false, area: false, budget: false }, housing: "apt", target: "living", area: "apt59", shape: "std", sizes: E.suggestSizes(E.roomFor("apt", "apt59", "living"), "living"), touched: false,
+const st = { chosen: { target: false, size: false, budget: false }, housing: "apt", target: "living", size: "m", shape: "std", sizes: E.suggestSizes(E.roomBySize("living", "m", "std"), "living"), touched: false,
   view: JSON.parse(JSON.stringify(E.DEFAULT_VIEW)), door: "sliding",
-  locked: new Set(), photoMode: "sample", sampleId: null, photo: null, struct: "unknown", era: "unknown", rooms: 3, baths: 2, planTouched: false, rental: false, budget: 150000, customBudget: false, custom: null };
+  locked: new Set(), photoMode: "sample", sampleId: null, photo: null, rental: false, budget: 150000, customBudget: false, custom: null };
 function renumber() { let n = 1; document.querySelectorAll("main h2[data-n]").forEach((h) => { if (h.closest("[hidden]")) return; h.textContent = `${n++}. ${h.dataset.n}`; }); }
 function renderAdvSummary() {
   const v = st.view, O = E.SIZE_OPTIONS, parts = [`창 ${v.windows.length ? v.windows.map((w) => E.WALLS[w]).join("·") : "없음"}`, `큰 가구 ${E.BIG_WALLS[v.bigWall]}`, `문 ${E.DOOR_POS[v.door]}`];
   $("#advSummary").innerHTML = `우리 집과 다르면 바꾸기 (선택)<br><span class="mut">지금 가정: ${esc(parts.join(" · "))}${st.locked.size ? ` · 이동 불가 ${st.locked.size}개` : ""}</span>`;
 }
-const H = () => E.HOUSING.find((x) => x.id === st.housing);
-const planOf = () => st.housing === "apt" ? { rooms: st.rooms, baths: st.baths } : null;
-// 평형·준공 시기를 바꾸면(직접 고른 적이 없을 때) 그 평형의 일반적인 방·화장실 개수로 맞춘다.
-function syncPlan() {
-  if (st.housing !== "apt") return;
-  const a = H().areas.find((x) => x.id === st.area);
-  if (a && !st.planTouched) { const d = E.aptPlanDefault(a.sqm, st.era); st.rooms = d.rooms; st.baths = d.baths; }
-  if (st.rooms < 2 && st.target === "small") st.target = "master";
-}
-const room = () => st.custom || E.roomFor(st.housing, st.area, st.target, st.shape, st.era, planOf());
+const room = () => st.custom || E.roomBySize(st.target, st.size, st.shape);
 const living = () => st.target === "living";
 const engineOpts = (extra) => Object.assign({ housing: st.housing, target: st.target, sizes: st.sizes, view: st.view, door: st.door, locked: [...st.locked] }, extra || {});
 function resetSizes() { st.sizes = E.suggestSizes(room(), st.target); st.touched = false; }
@@ -263,18 +255,8 @@ const obsSvg = (size, corner) => {
   return MINI((sz ? `<rect x="${x}" y="${y}" width="${sz}" height="${sz}" fill="var(--line)" stroke="var(--fg)" stroke-dasharray="2 2"/>` : "") + camera);
 };
 const doorSvgPos = (pos) => { const x = pos === "left" ? 24 : pos === "center" ? 44 : 64; return MINI(`<rect x="${x}" y="69" width="22" height="6" fill="var(--bg)" stroke="var(--acc)" stroke-width="2"/>` + camera); };
-function areaSvg(a, h, maxSqm) {
-  const r = E.roomFor(h.id, a.id, st.target, "std");
-  const k = 96 / Math.sqrt(maxSqm * 1.2), S = Math.sqrt(a.sqm * 1.2) * k;
-  const full = E.roomFor(h.id, a.id, st.target, "std");
-  const scale = S / Math.sqrt(a.sqm * 10000 * 1.2);
-  const rw = Math.min(full.W * scale, S - 6), rh = Math.min(full.D * scale, S - 6);
-  const ox = (110 - S) / 2, oy = (104 - S) / 2 + 2;
-  return `<svg viewBox="0 0 110 108" aria-hidden="true"><rect x="${ox}" y="${oy}" width="${S}" height="${S}" fill="none" stroke="var(--fg)" stroke-width="2"/>
-    <rect x="${ox + 3}" y="${oy + 3}" width="${rw}" height="${rh}" fill="var(--acc)" fill-opacity=".35" stroke="var(--acc)"/></svg>`;
-}
 function shapeSvg(id) {
-  const r = E.roomFor(st.housing, st.area, st.target, id), k = 70 / Math.max(r.W, r.D), w = r.W * k, h = r.D * k;
+  const r = E.roomBySize(st.target, st.size, id), k = 70 / Math.max(r.W, r.D), w = r.W * k, h = r.D * k;
   return `<svg viewBox="0 0 110 84" aria-hidden="true"><rect x="${(110 - w) / 2}" y="${(84 - h) / 2}" width="${w}" height="${h}" fill="var(--acc)" fill-opacity=".25" stroke="var(--fg)" stroke-width="2"/></svg>`;
 }
 function furnSvg(len, dep, maxLen, label) {
@@ -291,44 +273,17 @@ const card = (grp, val, svg, title, sub, pressed) =>
   `<button type="button" class="card" data-g="${grp}" data-v="${esc(val)}" aria-pressed="${pressed}">${svg || ""}<b>${esc(title)}</b>${sub ? `<small>${sub}</small>` : ""}</button>`;
 
 /* ---------- 렌더 ---------- */
-function renderHousing() {
-  $("#housing").innerHTML = E.HOUSING.map((x) => segBtn("housing", x.id, x.label, st.chosen.housing && x.id === st.housing)).join("");
-  $("#housingDesc").textContent = st.chosen.housing ? H().desc : "";
-}
 function renderTarget() {
-  const h = H();
-  $("#targetBox").hidden = h.targets.length < 2;
-  $("#target").innerHTML = h.targets.filter((t) => !(h.id === "apt" && t === "small" && st.rooms < 2)).map((t) => segBtn("target", t, E.TARGETS[t].label, t === st.target)).join("");
-  $("#targetDesc").textContent = E.TARGETS[st.target].desc;
+  $("#target").innerHTML = ["living", "master", "small"].map((t) => segBtn("target", t, E.TARGETS[t].label, st.chosen.target && t === st.target)).join("");
+  $("#targetDesc").textContent = st.chosen.target ? E.TARGETS[st.target].desc : "";
 }
-function structSvg(sx) {
-  const r = E.roomFor("apt", "apt84", "living", sx.shape), k = 52 / Math.max(r.W, r.D), w = r.W * k, h = r.D * k, x0 = (110 - w) / 2, y0 = (84 - h) / 2 - 2;
-  const bar = (wall) => { const L = sx.winSize === "lg" ? 0.7 : sx.winSize === "sm" ? 0.3 : 0.5;
-    return wall === "far" ? `<rect x="${x0 + w * (1 - L) / 2}" y="${y0 - 2}" width="${w * L}" height="5" fill="var(--acc)"/>` : wall === "left" ? `<rect x="${x0 - 2}" y="${y0 + h * (1 - L) / 2}" width="5" height="${h * L}" fill="var(--acc)"/>` : `<rect x="${x0 + w - 3}" y="${y0 + h * (1 - L) / 2}" width="5" height="${h * L}" fill="var(--acc)"/>`; };
-  return `<svg viewBox="0 0 110 84" aria-hidden="true"><rect x="${x0}" y="${y0}" width="${w}" height="${h}" fill="var(--acc)" fill-opacity=".15" stroke="var(--fg)" stroke-width="2"/>${sx.windows.map(bar).join("")}<text x="55" y="80" font-size="8" text-anchor="middle" fill="var(--acc)">▲ 문(촬영 위치)</text></svg>`;
-}
-function renderStructs() {
-  $("#structBox").hidden = st.housing !== "apt";
-  $("#roomsSel").innerHTML = [1, 2, 3, 4, 5].map((n) => segBtn("rooms", n, n + "개", st.rooms === n)).join("");
-  $("#bathsSel").innerHTML = [1, 2, 3].map((n) => segBtn("baths", n, n + "개", st.baths === n)).join("");
-  $("#planDesc").textContent = st.planTouched ? "직접 고른 구성으로 거실·안방·작은방 크기를 다시 계산했어요." : "고른 평형의 일반적인 구성이에요. 우리 집과 다르면 바꿔주세요. 방이 많을수록 각 방이 작아져요(가정값).";
-  $("#structs").innerHTML = E.APT_STRUCTURES.map((sx) => segBtn("struct", sx.id, sx.label, st.struct === sx.id)).join("");
-  const cur = E.APT_STRUCTURES.find((x) => x.id === st.struct); $("#structDesc").textContent = cur ? cur.desc : "";
-}
-function renderAreaInfo() {
-  const h = H(), a = h.areas.find((x) => x.id === st.area), r = room(), el = $("#areaInfo");
-  el.classList.toggle("unset", !st.chosen.area);
-  el.innerHTML = st.chosen.area && a
-    ? `<b>${esc(a.label)}</b> · 전용 약 ${a.sqm}㎡ (${a.pyeong}평)<br>${esc(a.desc)}${a.rooms ? `<br>방 ${a.rooms[0] === a.rooms[1] ? a.rooms[0] : a.rooms[0] + "~" + a.rooms[1]}개(일반적인 구성)` : ""}<br>${esc(E.TARGETS[st.target].label)} 크기(추정) 약 ${(r.W / 100).toFixed(1)}×${(r.D / 100).toFixed(1)}m${st.custom ? " (직접 입력)" : ""}`
-    : "슬라이더를 움직여 크기를 선택해주세요";
-  $("#roomLine").textContent = `선택한 ${E.TARGETS[st.target].label} 크기(추정): 가로 ${r.W}cm × 세로 ${r.D}cm${st.custom ? " (직접 입력)" : ""}`;
-}
-function renderAreas() {
-  const h = H(), n = h.areas.length, idx = Math.max(0, h.areas.findIndex((a) => a.id === st.area));
-  $("#areaTitle").innerHTML = (h.id === "apt" ? "평형 (공급면적)" : "집 크기 (전용면적)") + ' <i class="req">필수</i>';
-  const rg = $("#areaRange"); rg.max = n - 1; rg.value = idx;
-  $("#tickMin").textContent = h.areas[0].label; $("#tickMax").textContent = h.areas[n - 1].label;
-  renderAreaInfo();
+function renderSizes() {
+  const list = E.ROOM_SIZES[st.target] || E.ROOM_SIZES.small;
+  $("#sizes").innerHTML = list.map((x) => `<button type="button" class="card" data-g="size" data-v="${x.id}" aria-pressed="${st.chosen.size && !st.custom && st.size === x.id}"><b>${esc(x.label)}</b><small>약 ${(x.W / 100).toFixed(1)}×${(x.D / 100).toFixed(1)}m</small></button>`).join("")
+    + `<button type="button" class="card" data-g="size" data-v="unknown" aria-pressed="${st.chosen.size && !st.custom && st.size === "unknown"}"><b>잘 모르겠어요</b><small>보통 크기로 계산해요</small></button>`;
+  const r = room();
+  $("#sizeInfo").textContent = `${E.TARGETS[st.target].label} 크기(추정): 가로 ${r.W}cm × 세로 ${r.D}cm${st.custom ? " (직접 입력)" : ""}. 가정값이라 줄자로 재어 아래에 입력하면 더 정확해요.`;
+  $("#roomLine").textContent = "";
   $("#shapes").innerHTML = E.SHAPES.map((x) => segBtn("shape", x.id, x.label, x.id === st.shape && !st.custom)).join("");
 }
 function renderView() {
@@ -346,23 +301,31 @@ function renderView() {
   $("#view").innerHTML = h;
 }
 function renderFurn() {
-  const O = E.SIZE_OPTIONS;
-  $("#furnHelp").textContent = st.touched ? "직접 고른 크기를 쓰고 있어요." : "방 크기에 맞는 크기를 미리 골라두었어요. 우리 집과 다르면 바꿔주세요.";
+  const O = E.SIZE_OPTIONS, Z = st.sizes;
+  $("#furnHelp").textContent = st.touched ? "직접 고른 크기를 쓰고 있어요. 가구가 없으면 오른쪽 '없음'을 누르세요." : "방 크기에 맞는 크기를 미리 골라두었어요. 우리 집과 다르면 바꾸고, 없는 가구는 '없음'을 누르세요.";
+  const row = (label, kind, opts, none) => `<div class="frow"><b>${label}</b><div class="fs">${opts.map((o) => `<button type="button" class="fb" data-fz="${kind}" data-v="${o.id}" aria-pressed="${o.on}">${esc(o.l)}</button>`).join("")}${none === null ? "" : `<button type="button" class="fb none" data-fz="${kind}" data-v="none" aria-pressed="${none}">없음</button>`}</div></div>`;
   let h = "";
   if (living()) {
-    const ms = Math.max(...O.sofa.map((o) => o.v)), mt = Math.max(...O.tv.map((o) => o.v)), mtb = Math.max(...O.table.map((o) => o.l));
-    h += `<h3>소파</h3><div class="cards sm">${O.sofa.map((o) => card("sofa", o.id, furnSvg(o.v, 95, ms, "소파"), o.label, `가로 약 ${o.v}cm`, st.sizes.sofa === o.v)).join("")}</div>`;
-    h += `<h3>TV장</h3><div class="cards sm">${O.tv.map((o) => card("tv", o.id, furnSvg(o.v, 45, mt, "TV장"), o.label, `길이 약 ${o.v}cm`, st.sizes.tvL === o.v)).join("")}</div>`;
-    h += `<h3>커피테이블</h3><div class="cards sm">${O.table.map((o) => card("table", o.id, furnSvg(o.l, o.w, mtb, "테이블"), o.label, `약 ${o.l}×${o.w}cm`, st.sizes.tableL === o.l)).join("")}</div>`;
+    h += row("소파", "sofa", O.sofa.map((o) => ({ id: o.id, l: o.label, on: Z.sofa === o.v })), Z.sofa === 0);
+    h += row("TV장", "tv", O.tv.map((o) => ({ id: o.id, l: o.label, on: Z.tvL === o.v })), Z.tvL === 0);
+    h += row("테이블", "table", O.table.map((o) => ({ id: o.id, l: o.label.replace(" 테이블", ""), on: Z.tableL === o.l })), Z.tableL === 0);
   } else {
-    h += `<h3>침대</h3><div class="cards sm">${O.bed.map((o) => card("bed", o.id, furnSvg(o.v, 200, 200, o.v + "×200"), o.label, `폭 ${o.v}cm`, st.sizes.bed === o.v)).join("")}</div>`;
-    h += `<h3>옷장</h3><div class="cards sm">${O.ward.map((o) => card("ward", o.id, furnSvg(o.v, 55, 160, "옷장"), o.label, `길이 약 ${o.v}cm`, st.sizes.ward === o.v)).join("")}</div>`;
-    h += `<h3>책상</h3><div class="cards sm">${O.desk.map((o) => card("desk", o.id, o.v ? furnSvg(o.v, 60, 140, "책상") : "", o.label, o.v ? `폭 약 ${o.v}cm` : "", st.sizes.desk === o.v)).join("")}</div>`;
+    h += row("침대", "bed", O.bed.map((o) => ({ id: o.id, l: o.label, on: Z.bed === o.v })), Z.bed === 0);
+    h += row("옷장", "ward", O.ward.map((o) => ({ id: o.id, l: o.label.replace(" 옷장", ""), on: Z.ward === o.v })), Z.ward === 0);
+    h += row("책상", "desk", O.desk.filter((o) => o.v > 0).map((o) => ({ id: o.id, l: o.label.replace(" 책상", ""), on: Z.desk === o.v })), Z.desk === 0);
   }
   $("#furn").innerHTML = h;
 }
+let LV = null;
 function renderLock() {
   const r = room();
+  if (Views3D.ok()) { // 3D로 보여주고, 가구를 누르면 이동 불가(🔒) 표시
+    try {
+      const b = Views3D.before(r, engineOpts(), itemNames());
+      if (!LV) LV = Scene3D.lockView($("#lockPlan"), (id) => { st.locked.has(id) ? st.locked.delete(id) : st.locked.add(id); renderLock(); renderAdvSummary(); $("#out").innerHTML = ""; $("#quote").hidden = true; });
+      LV.update({ U: b.ctx.U, windows: b.ctx.windows, door: b.ctx.door }, b.objs, st.locked); return;
+    } catch (e) { /* 3D를 쓸 수 없으면 아래 도면으로 */ }
+  }
   $("#lockPlan").innerHTML = E.svg(r, E.currentScene(r, engineOpts()), { interactive: true, locked: [...st.locked] });
 }
 function renderBudget() {
@@ -371,67 +334,64 @@ function renderBudget() {
   $("#customBox").hidden = !st.customBudget;
 }
 function renderBasicsSummary() {
-  const h = H(), a = h.areas.find((x) => x.id === st.area), sh = E.SHAPES.find((x) => x.id === st.shape);
-  $("#basicsSummary").innerHTML = `우리 집 선택 <span class="mut">· ${esc(h.label)} · ${esc(a ? a.label : "")} · ${esc(E.TARGETS[st.target].label)} · ${esc(sh ? sh.label : "")}${st.custom ? " · 줄자 입력" : ""}</span>`;
+  const sh = E.SHAPES.find((x) => x.id === st.shape), sz = (E.ROOM_SIZES[st.target] || []).find((x) => x.id === st.size);
+  $("#basicsSummary").innerHTML = `방 선택 <span class="mut">· ${esc(E.TARGETS[st.target].label)} · ${st.custom ? "줄자 입력" : esc(st.chosen.size ? (sz ? sz.label : "잘 모르겠어요") : "크기 미선택")} · ${esc(sh ? sh.label : "")}</span>`;
 }
 const SAMPLES = (window.SAMPLES || []).concat(window.SAMPLES_LOCAL || []);
-// 사진이 없는 조합은 엔진이 그리는 도식 예시(작은/보통/큰 집 × 모양)로 3개를 채운다. 사진은 아니다.
-const GEN_PICKS = [[0.25, "std"], [0.55, "wide"], [0.85, "std"]];
-function genSample(hid, t, k) {
-  const h = E.HOUSING.find((x) => x.id === hid), [pos, shape] = GEN_PICKS[k], a = h.areas[Math.round(pos * (h.areas.length - 1))];
-  const sh = E.SHAPES.find((x) => x.id === shape), r = E.roomFor(hid, a.id, t, shape), sizes = E.suggestSizes(r, t);
-  const o = { housing: hid, target: t, sizes, view: JSON.parse(JSON.stringify(E.DEFAULT_VIEW)), door: "sliding", locked: [] };
-  let thumb = ""; try { thumb = E.svg(r, E.currentScene(r, o), {}); } catch (e) {}
-  return { id: `gen-${hid}-${t}-${k}`, label: `${a.label} · ${sh.label}`, desc: `${E.TARGETS[t].label} 약 ${(r.W / 100).toFixed(1)}×${(r.D / 100).toFixed(1)}m`, thumb, preset: { housing: hid, target: t, area: a.id, shape, door: "sliding" } };
+function samplesFor(t) {
+  // 고른 방에서 자주 쓰는 배치 3가지(1·2·3안)
+  return SAMPLES.filter((x) => x.layout && x.preset.target === t).sort((a, b) => a.id.localeCompare(b.id)).slice(0, 3);
 }
-function samplesFor(hid, t) {
-  // 고른 집·평형·방은 그대로 두고, 같은 크기에서 자주 쓰는 배치 3가지(1·2·3안)를 보여준다. 배치 예시가 없으면 도식으로 채운다.
-  const out = SAMPLES.filter((x) => x.layout && x.preset.housing === hid && x.preset.target === t).sort((a, b) => a.id.localeCompare(b.id)).slice(0, 3);
-  for (let k = 0; out.length < 3; k++) out.push(genSample(hid, t, k));
-  return out;
-}
-const sampleOf = (id) => SAMPLES.find((x) => x.id === id) || (/^gen-/.test(id || "") ? (() => { const [, h, t, k] = id.split("-"); return genSample(h, t, Number(k)); })() : null);
+const sampleOf = (id) => SAMPLES.find((x) => x.id === id) || null;
 function renderPhotoMode() {
   $("#photoMode").innerHTML = [["sample", "예시 방으로 해보기"], ["own", "내 방 사진으로 진행"]].map(([m, t]) => `<button type="button" data-pmode="${m}" aria-pressed="${st.photoMode === m}">${t}</button>`).join("");
   $("#sampleBox").hidden = st.photoMode !== "sample"; $("#ownBox").hidden = st.photoMode !== "own";
   // 현재 선택(집 종류+방)과 같은 예시만, 정확히 3개: 사진 예시를 먼저, 부족하면 같은 조건의 도식 예시로 채운다.
-  const list = samplesFor(st.housing, st.target);
-  { const a = (H().areas.find((x) => x.id === st.area) || {}); $("#sampleNote").textContent = `${st.chosen.area ? a.label + " " : ""}${E.TARGETS[st.target].label}에서 자주 쓰는 배치 3가지예요. 우리 집과 가장 비슷한 안을 골라주세요.`; }
+  const list = samplesFor(st.target);
+  $("#sampleNote").textContent = `${E.TARGETS[st.target].label}에서 자주 쓰는 배치 3가지예요. 우리 집과 가장 비슷한 안을 골라주세요.`;
   $("#samples").innerHTML = list.map((x) => `<button type="button" class="card" data-sample="${esc(x.id)}" aria-pressed="${st.sampleId === x.id}">${x.img ? `<img src="${esc(x.img)}" alt="" style="width:100%;height:84px;object-fit:cover;border-radius:8px;margin-bottom:4px">` : `<div class="thumbfb" style="height:84px;margin-bottom:4px;overflow:hidden">${x.thumb}</div>`}<b>${esc(x.label)}</b><small>${esc(x.desc)}</small></button>`).join("");
   $("#sampleCredit").textContent = "";
 }
 function applySample(x) {
   const p = x.preset;
-  st.housing = p.housing; st.target = p.target; if (p.area) st.area = p.area; if (p.shape) st.shape = p.shape; st.custom = null; st.locked.clear();
+  st.target = p.target; if (p.shape) st.shape = p.shape; st.custom = null; st.locked.clear();
   st.view = JSON.parse(JSON.stringify(Object.assign({}, E.DEFAULT_VIEW, p.view || {}))); st.door = p.door || "sliding";
-  st.sizes = Object.assign({}, E.suggestSizes(room(), st.target), p.sizes || {}); st.touched = true;
-  st.chosen.housing = true; st.chosen.area = true; if (p.area) { st.planTouched = false; st.era = "unknown"; syncPlan(); }
+  st.chosen.target = true; if (!st.chosen.size) { st.size = "unknown"; st.chosen.size = true; }
+  if (!st.touched) st.sizes = Object.assign({}, E.suggestSizes(room(), st.target)); // 직접 고른 가구(없음 포함)는 예시를 골라도 유지
+  if (p.sizes) { Object.assign(st.sizes, p.sizes); st.touched = true; }
   st.photoMode = "sample"; st.sampleId = x.id; st.photo = x.img || null;
 }
-function missing() { const m = []; if (!st.chosen.housing) m.push(["집 종류", "#gHousing"]); if (!st.chosen.area) m.push(["평형", "#gArea"]); if (!st.chosen.budget || !(st.budget > 0)) m.push(["예산", "#gBudget"]); return m; }
+function missing() { const m = []; if (!st.chosen.target) m.push(["꾸밀 방", "#gTarget"]); if (!st.chosen.size && !st.custom) m.push(["방 크기", "#gSize"]); if (!st.chosen.budget || !(st.budget > 0)) m.push(["예산", "#gBudget"]); return m; }
 function updateBar() {
   const m = missing(), b = $("#go");
   b.classList.toggle("off", m.length > 0);
   b.textContent = m.length ? `필수 항목을 선택해주세요 (${m.length}개 남음)` : "셀프 인테리어 추천 보기";
 }
 function renderAll() {
-  renderAdvSummary(); renderBasicsSummary(); renderPhotoMode(); renderStructs(); updateBar();
-  renderHousing(); renderTarget(); renderAreas(); renderView(); renderFurn(); renderLock(); renderBudget(); renumber(); $("#out").innerHTML = ""; $("#quote").hidden = true;
+  renderAdvSummary(); renderBasicsSummary(); renderPhotoMode(); updateBar();
+  renderTarget(); renderSizes(); renderView(); renderFurn(); renderLock(); renderBudget(); renumber(); $("#out").innerHTML = ""; $("#quote").hidden = true;
 }
 
 /* ---------- 이벤트 ---------- */
 document.addEventListener("click", (e) => {
+  const fz = e.target.closest("button[data-fz]");
+  if (fz) {
+    const k = fz.dataset.fz, v = fz.dataset.v, O = E.SIZE_OPTIONS, none = v === "none";
+    if (k === "sofa") st.sizes.sofa = none ? 0 : O.sofa.find((o) => o.id === v).v;
+    else if (k === "tv") st.sizes.tvL = none ? 0 : O.tv.find((o) => o.id === v).v;
+    else if (k === "table") { const o = none ? { w: 0, l: 0 } : O.table.find((x) => x.id === v); st.sizes.tableW = o.w; st.sizes.tableL = o.l; }
+    else if (k === "bed") st.sizes.bed = none ? 0 : O.bed.find((o) => o.id === v).v;
+    else if (k === "ward") st.sizes.ward = none ? 0 : O.ward.find((o) => o.id === v).v;
+    else if (k === "desk") { st.sizes.desk = none ? 0 : O.desk.find((o) => o.id === v).v; st.locked.delete("desk"); }
+    st.touched = true; renderAll(); return;
+  }
   const c = e.target.closest("button[data-g]");
   if (c) {
     const g = c.dataset.g, v = c.dataset.v, O = E.SIZE_OPTIONS;
     let touchSize = false;
-    if (g === "housing") { st.chosen.housing = true; st.chosen.area = false; st.struct = "unknown"; st.era = "unknown"; st.planTouched = false; st.housing = v; const h = H(); st.target = h.targets[0]; st.area = h.areas[Math.min(3, h.areas.length - 1)].id; st.custom = null; st.locked.clear(); syncPlan(); resetSizes(); }
-    else if (g === "target") { st.target = v; st.custom = null; st.locked.clear(); resetSizes(); }
-    else if (g === "area") { st.area = v; st.custom = null; syncPlan(); if (!st.touched) resetSizes(); }
+    if (g === "target") { st.target = v; st.chosen.target = true; st.custom = null; st.locked.clear(); st.sampleId = null; st.photo = st.photoMode === "own" ? st.ownPhoto || null : null; resetSizes(); }
+    else if (g === "size") { st.size = v; st.chosen.size = true; st.custom = null; if (!st.touched) resetSizes(); }
     else if (g === "shape") { st.shape = v; st.custom = null; if (!st.touched) resetSizes(); }
-    else if (g === "era") { st.era = v; st.custom = null; syncPlan(); if (!st.touched) resetSizes(); }
-    else if (g === "rooms" || g === "baths") { st[g] = Number(v); st.planTouched = true; st.custom = null; syncPlan(); if (!st.touched) resetSizes(); }
-    else if (g === "struct") { const sx = E.APT_STRUCTURES.find((x) => x.id === v); st.struct = v; st.shape = sx.shape; st.view.windows = [...sx.windows]; st.view.winSize = sx.winSize; st.custom = null; if (!st.touched) resetSizes(); track("struct-" + v); }
     else if (g === "win") { const i = st.view.windows.indexOf(v); i >= 0 ? st.view.windows.splice(i, 1) : st.view.windows.push(v); }
     else if (g === "big") st.view.bigWall = v;
     else if (g === "door") st.view.door = v;
@@ -439,13 +399,7 @@ document.addEventListener("click", (e) => {
     else if (g === "obs") st.view.obstacle.size = v;
     else if (g === "corner") st.view.obstacle.corner = v;
     else if (g === "open") st.door = v;
-    else { touchSize = true;
-      if (g === "sofa") st.sizes.sofa = O.sofa.find((o) => o.id === v).v;
-      else if (g === "tv") st.sizes.tvL = O.tv.find((o) => o.id === v).v;
-      else if (g === "table") { const o = O.table.find((x) => x.id === v); st.sizes.tableW = o.w; st.sizes.tableL = o.l; }
-      else if (g === "bed") st.sizes.bed = O.bed.find((o) => o.id === v).v;
-      else if (g === "ward") st.sizes.ward = O.ward.find((o) => o.id === v).v;
-      else if (g === "desk") { st.sizes.desk = O.desk.find((o) => o.id === v).v; st.locked.delete("desk"); } }
+    else touchSize = false;
     if (touchSize) st.touched = true;
     renderAll(); return;
   }
@@ -474,17 +428,28 @@ function shot() {
   st.ownPhoto = data; st.photo = data; st.sampleId = null;
   const img = $("#preview"); img.src = st.photo; img.hidden = false; closeCam(); track("own-photo-camera");
 }
-const onArea = (e) => { const h = H(), i = Number($("#areaRange").value), a = h.areas[i]; if (!a) return;
-  st.chosen.area = true; st.area = a.id; st.custom = null; syncPlan(); if (!st.touched) resetSizes();
-  renderAreaInfo(); renderAdvSummary(); renderBasicsSummary(); renderPhotoMode(); renderStructs(); renderLock(); renderFurn(); updateBar(); $("#out").innerHTML = ""; $("#quote").hidden = true; };
-$("#areaRange").addEventListener("input", onArea); $("#areaRange").addEventListener("pointerdown", () => setTimeout(onArea, 0)); $("#areaRange").addEventListener("keydown", () => setTimeout(onArea, 0));
+// 맨 위 비교 이미지: 실사(AI 변환 이미지) ↔ 3D 모형(같은 방을 3D로 그린 것)
+let HERO3D = null;
+function heroMode(mode) {
+  const bA = $("#baAfter"), bB = $("#baBefore");
+  document.querySelectorAll("#heroMode button").forEach((b) => b.setAttribute("aria-pressed", b.dataset.hero === mode));
+  if (mode === "3d" && Views3D.ok()) {
+    if (!HERO3D) { try {
+      const r = E.roomBySize("living", "l", "std"), opts = { housing: "apt", target: "living", sizes: E.suggestSizes(r, "living"), view: JSON.parse(JSON.stringify(E.DEFAULT_VIEW)), budget: 500000 };
+      const cs = E.candidates(r, opts), c = cs.find((x) => x.id === "A"), b = Views3D.before(r, opts, itemNames()), ao = Views3D.after(c, b, c.purchase.inBudget.map((i) => i.key), itemNames()), room = { U: b.ctx.U, windows: b.ctx.windows, door: b.ctx.door };
+      HERO3D = { before: Scene3D.snapshot(room, b.objs, "front", 720, 480), after: Scene3D.snapshot(room, ao, "front", 720, 480) }; } catch (e) { return; } }
+    bB.src = HERO3D.before; bA.src = HERO3D.after;
+  } else { bB.src = "samples/hero_before.jpg"; bA.src = "samples/hero_after.jpg"; }
+}
+$("#heroMode").addEventListener("click", (e) => { const b = e.target.closest("button[data-hero]"); if (b) heroMode(b.dataset.hero); });
 $("#baRange").addEventListener("input", (e) => { const v = Number(e.target.value); $("#baBefore").style.clipPath = `inset(0 ${100 - v}% 0 0)`; $("#baLine").style.left = v + "%"; });
 const showCustomWon = () => { $("#customBudgetWon").textContent = st.budget > 0 ? `= ${won(st.budget)}` : ""; };
 $("#customBudget").addEventListener("input", (e) => { st.budget = Math.round(Number(e.target.value) * 10000) || 0; showCustomWon(); updateBar(); });
 ["#w", "#d"].forEach((s) => $(s).addEventListener("input", () => {
   const W = Number($("#w").value), D = Number($("#d").value);
-  st.custom = W >= 200 && D >= 200 ? { W, D } : null; if (st.custom) st.chosen.area = true; if (!st.touched) resetSizes(); renderAreas(); renderFurn(); renderLock(); updateBar(); }));
-$("#clearCustom").addEventListener("click", () => { st.custom = null; $("#w").value = ""; $("#d").value = ""; if (!st.touched) resetSizes(); renderAreas(); renderFurn(); renderLock(); updateBar(); });
+  st.custom = W >= 200 && D >= 200 ? { W, D } : null; if (st.custom) st.chosen.size = true; if (!st.touched) resetSizes(); renderSizes(); renderBasicsSummary(); renderFurn(); renderLock(); updateBar(); }));
+$("#clearCustom").addEventListener("click", () => { st.custom = null; $("#w").value = ""; $("#d").value = ""; if (!st.touched) resetSizes(); renderSizes(); renderBasicsSummary(); renderFurn(); renderLock(); updateBar(); });
+$("#adv").addEventListener("toggle", () => { if (LV) setTimeout(() => LV.resize(), 50); });
 $("#rental").addEventListener("change", (e) => { st.rental = e.target.checked; });
 function compress(file) {
   return new Promise((res) => { const img = new Image(), url = URL.createObjectURL(file);
@@ -558,9 +523,8 @@ const REG = {}; // 제품 보기용: 품목 키 → 품목
 const reg = (items) => items.forEach((i) => { REG[i.key] = i; });
 const itemHtml = (it, over) => Editor.row(it, over);
 const metaText = () => {
-  const r = room(), h = H();
-  const area = h.areas.find((a) => a.id === st.area);
-  return { 집: h.label + (area ? ` · ${area.label}` : ""), 방: E.TARGETS[st.target].label, 크기: `${r.W}×${r.D}cm`,
+  const r = room();
+  return { 방: E.TARGETS[st.target].label, 크기: `${r.W}×${r.D}cm`,
     구조: `창 ${st.view.windows.length ? st.view.windows.map((w) => E.WALLS[w]).join("·") : "없음"} / 큰 가구 ${E.BIG_WALLS[st.view.bigWall]} / 문 ${E.DOOR_POS[st.view.door]}` };
 };
 $("#go").addEventListener("click", () => {
@@ -585,7 +549,7 @@ $("#go").addEventListener("click", () => {
   const B3 = Views3D.ok() ? Views3D.before(r, opts, itemNames()) : null; LAST.B3 = B3; LAST.v3 = {};
   const names = Object.fromEntries(E.currentScene(r, engineOpts()).pieces.map((p) => [p.id, p.label]));
   const lockNote = st.locked.size ? `<p class="mut">이동 불가: ${[...st.locked].map((id) => esc(names[id] || id)).join(", ")}</p>` : "";
-  $("#out").innerHTML = `<h2>추천 (${esc(H().label)} ${esc(E.TARGETS[st.target].label)} · ${r.W}×${r.D}cm · 예산 ${won(st.budget)})</h2>
+  $("#out").innerHTML = `<h2>추천 (${esc(E.TARGETS[st.target].label)} · ${r.W}×${r.D}cm · 예산 ${won(st.budget)})</h2>
     <p class="mut">현재 배치는 일반적인 구성으로 가정했어요. 실제와 다르면 위에서 가구 크기와 구조를 바꿔보세요.</p>${lockNote}
     ${st.photo && !st.sampleId ? `<p class="mut">내 방 사진</p><img src="${st.photo}" alt="내 방 사진" style="max-width:100%;border-radius:10px">` : ""}` +
     (E.anyApplicable(cs) ? "" : `<p class="mut"><b>이동 불가로 지정한 가구 때문에 적용할 수 있는 안이 없어요.</b> 일부를 해제해보세요.</p>`) +
@@ -621,10 +585,10 @@ const loadQ = () => { try { return JSON.parse(localStorage.getItem(QKEY)) || [];
 const saveQ = (a) => { try { localStorage.setItem(QKEY, JSON.stringify(a)); return true; } catch (e) { return false; } };
 const photoOf = (id) => { try { return localStorage.getItem("diy_photo_" + id); } catch (e) { return null; } };
 const savePhoto = (id, data) => { try { localStorage.setItem("diy_photo_" + id, data); return true; } catch (e) { return false; } };
-const snapshot = () => ({ housing: st.housing, target: st.target, area: st.area, shape: st.shape, custom: st.custom, sizes: st.sizes, view: st.view,
-  door: st.door, locked: [...st.locked], era: st.era, rooms: st.rooms, baths: st.baths, rental: st.rental, budget: st.budget });
+const snapshot = () => ({ housing: st.housing, target: st.target, size: st.size, shape: st.shape, custom: st.custom, sizes: st.sizes, view: st.view,
+  door: st.door, locked: [...st.locked], rental: st.rental, budget: st.budget });
 function restore(rec) {
-  const s = rec.st, r = s.custom || E.roomFor(s.housing, s.area, s.target, s.shape, s.era, s.rooms ? { rooms: s.rooms, baths: s.baths } : null);
+  const s = rec.st, r = s.custom || (s.size ? E.roomBySize(s.target, s.size, s.shape) : E.roomFor(s.housing, s.area, s.target, s.shape, s.era, s.rooms ? { rooms: s.rooms, baths: s.baths } : null));
   const opts = { housing: s.housing, target: s.target, sizes: s.sizes, view: s.view, door: s.door, locked: s.locked, budget: s.budget, rental: s.rental };
   return { r, opts, cs: E.candidates(r, opts) };
 }
@@ -635,7 +599,7 @@ function renderMyQuotes() {
 }
 function saveAndOpen(candId, layout, extra) {
   const c = LAST.cs.find((x) => x.id === candId);
-  const rec = { id: E.buildQuote(c, {}).id, created: Date.now(), title: `${H().label} ${E.TARGETS[st.target].label} · ${c.id}.${c.title}`, candId, st: JSON.parse(JSON.stringify(snapshot())), views: 0, checked: [], clicks: {}, pins: {} };
+  const rec = { id: E.buildQuote(c, {}).id, created: Date.now(), title: `${E.TARGETS[st.target].label} · ${c.id}.${c.title}`, candId, st: JSON.parse(JSON.stringify(snapshot())), views: 0, checked: [], clicks: {}, pins: {} };
   if (layout) rec.layout = layout;
   if (st.sampleId) { rec.sampleId = st.sampleId; rec.pins = JSON.parse(JSON.stringify((sampleOf(st.sampleId) || {}).pins || {})); }
   if (extra && extra.sampleId) { rec.sampleId = extra.sampleId; rec.pins = {}; }
@@ -681,7 +645,7 @@ function renderQuote(rec) {
   const { r, opts, cs } = restore(rec), c = cs.find((x) => x.id === rec.candId), pref = getPref();
   // 꾸미기 화면에서 고른 제품이 있으면 구매 리스트를 그에 맞춘다(없앤 제품은 빠지고, 더한 제품은 들어온다)
   if (rec.board && rec.board.length) { c.items = rec.board.filter((k) => E.ITEM[k]); c.purchase = E.planPurchase(c.items, rec.st.budget); }
-  const meta = { 집: `${E.HOUSING.find((h) => h.id === rec.st.housing).label}`, 방: E.TARGETS[rec.st.target].label, 크기: `${r.W}×${r.D}cm`,
+  const meta = { 방: E.TARGETS[rec.st.target].label, 크기: `${r.W}×${r.D}cm`,
     구조: `창 ${rec.st.view.windows.length ? rec.st.view.windows.map((w) => E.WALLS[w]).join("·") : "없음"} / 큰 가구 ${E.BIG_WALLS[rec.st.view.bigWall]} / 문 ${E.DOOR_POS[rec.st.view.door]}` };
   reg(c.purchase.inBudget.concat(c.purchase.over));
   const smp0 = rec.sampleId ? sampleOf(rec.sampleId) : null, ph0 = smp0 ? smp0.img : photoOf(rec.id);
@@ -748,7 +712,7 @@ document.addEventListener("click", (e) => {
   if (smp) { const x = sampleOf(smp.dataset.sample); if (x) { applySample(x); renderAll(); $("#basics").open = false; track("sample-picked-" + x.id); } return; }
   const stt = e.target.closest("[data-start]");
   if (stt) {
-    if (stt.dataset.start === "sample") { const x = SAMPLES.find((m) => m.preset.housing === st.housing && m.preset.target === st.target) || SAMPLES[0];
+    if (stt.dataset.start === "sample") { const x = samplesFor(st.target)[0];
       if (x) { applySample(x); renderAll(); $("#basics").open = false; } $("#photoMode").scrollIntoView({ behavior: "smooth" }); track("start-sample"); }
     else { st.photoMode = "own"; st.sampleId = null; st.photo = st.ownPhoto || null; $("#basics").open = true; renderAll(); $("#photoMode").scrollIntoView({ behavior: "smooth" }); track("start-own"); }
     return; }
@@ -782,7 +746,7 @@ document.addEventListener("click", (e) => {
     openScene(objs, b, (o2) => { rec.scene = o2; rec.board = Views3D.keysOf(o2); saveQ(all); renderQuote(rec); }); return; } }
   const bd = e.target.closest("[data-board]");
   if (bd && LAST) { const c = LAST.cs.find((x) => x.id === bd.dataset.board); if (c) {
-    const ex = samplesFor(st.housing, st.target).find((x) => x.img), sm = st.sampleId ? sampleOf(st.sampleId) : null;
+    const ex = samplesFor(st.target).find((x) => x.img), sm = st.sampleId ? sampleOf(st.sampleId) : null;
     const photo = st.photo || (ex && ex.img); if (!photo) { alert("사진이 없어요. 예시 방을 고르거나 내 방 사진을 올려주세요."); return; }
     openBoard(c, photo, sm && sm.pins, (placed) => saveAndOpen(c.id, null, { pins: Object.fromEntries(placed.map((p) => [p.key, { x: Math.round(p.x), y: Math.round(p.y) }])), sampleId: st.photo ? null : ex && ex.id, board: placed.map((p) => p.key) })); return; } }
   const qbd = e.target.closest("[data-qboard]");

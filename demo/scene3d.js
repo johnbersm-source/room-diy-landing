@@ -298,5 +298,40 @@
     (function loop() { if (!alive) return; if (dirty) { dirty = false; views.forEach((v) => v.r.render(sc, v.cam)); } requestAnimationFrame(loop); })();
   }
 
-  root.Scene3D = { snapshot, openEditor, buildModel, frontCamera, topCamera };
+  /* ---------- 이동 불가 가구 고르기용 3D 보기(정면 + 위에서). 가구를 누르면 onToggle(id) ---------- */
+  function lockView(el, onToggle) {
+    el.innerHTML = `<div class="mut" style="font-size:12px">문에서 본 모습 (가구를 눌러 고르세요)</div><div class="lvf" style="width:100%;aspect-ratio:4/3;border-radius:10px;overflow:hidden"></div>
+      <div class="mut" style="font-size:12px;margin-top:6px">위에서 본 모습 <span style="color:#b25b00">(주황색 = 문 열림 공간)</span></div><div class="lvt" style="width:100%;border-radius:10px;overflow:hidden"></div>`;
+    const fw = el.querySelector(".lvf"), tw = el.querySelector(".lvt");
+    const fr = new T.WebGLRenderer({ antialias: true }), tr = new T.WebGLRenderer({ antialias: true });
+    fw.appendChild(fr.domElement); tw.appendChild(tr.domElement); [fr, tr].forEach((r) => { r.domElement.style.cssText = "width:100%;height:100%;display:block;touch-action:manipulation"; });
+    let sc = null, U = null, objs = [], locked = new Set(), sig = "", cams = null, marks = null;
+    const views = [{ r: fr, el: fw }, { r: tr, el: tw }];
+    function size() { views.forEach((v) => { const w = v.el.clientWidth, h = v.el.clientHeight; if (w > 0 && h > 0) { v.r.setPixelRatio(Math.min(2, root.devicePixelRatio || 1)); v.r.setSize(w, h, false); } }); draw(); }
+    function draw() { if (!sc || !cams) return; fr.render(sc, cams.f); tr.render(sc, cams.t); }
+    function update(room, o2, lk) {
+      const nsig = JSON.stringify([room.U, room.windows, room.door]);
+      U = room.U; objs = o2.map((o) => Object.assign({}, o)); locked = new Set(lk);
+      if (nsig !== sig) { if (sc) disposeScene(sc); sc = newScene(U, room.windows, room.door, FRONT_BG); sig = nsig; const ta = Math.min(1.6, Math.max(0.75, (U.W + 50) / (U.D + 50))); tw.style.aspectRatio = ta + ""; cams = { f: frontCamera(U, room.door, 4 / 3), t: topCamera(U, ta) }; }
+      fillScene(sc, objs);
+      if (marks) sc.remove(marks); marks = new T.Group();
+      objs.forEach((o) => { if (!locked.has(o.id)) return;
+        const g = new T.Mesh(new T.BoxGeometry(o.w + 4, (o.h || 50) + 4, o.d + 4), new T.MeshBasicMaterial({ color: 0xe03131, transparent: true, opacity: 0.28, depthWrite: false })); g.position.set(o.cx, (o.elev || 0) + ((o.h || 50) + 4) / 2, o.cz); g.rotation.y = o.rot; marks.add(g);
+        const lbl = textSprite("🔒 이동 불가", Math.max(o.w, o.d), Math.max(o.w, o.d) * 0.3, "#b00020"); lbl.position.set(o.cx, (o.h || 50) + (o.elev || 0) + 4, o.cz); lbl.layers.set(1); marks.add(lbl); });
+      sc.add(marks); size();
+    }
+    const ray = new T.Raycaster(), ndc = new T.Vector2();
+    function click(v, cam, e) {
+      if (!sc) return; const r = v.r.domElement.getBoundingClientRect(); ndc.set(((e.clientX - r.left) / r.width) * 2 - 1, -((e.clientY - r.top) / r.height) * 2 + 1); ray.setFromCamera(ndc, cam); sc.updateMatrixWorld(true);
+      const ms = []; sc.children.forEach((c) => { if (c.userData && c.userData.isObj && !c.userData.label) c.traverse((m) => { if (m.isMesh && m.userData.ownerId) ms.push(m); }); });
+      const h = ray.intersectObjects(ms, false)[0]; if (!h) return;
+      const id = h.object.userData.ownerId, o = objs.find((x) => x.id === id); if (!o) return;
+      const host = o.mount === "on" ? o.host : id; if (objs.find((x) => x.id === host && x.type !== "pillar")) onToggle(host);
+    }
+    fr.domElement.addEventListener("click", (e) => click(views[0], cams && cams.f, e)); tr.domElement.addEventListener("click", (e) => click(views[1], cams && cams.t, e));
+    if (typeof ResizeObserver !== "undefined") { const ro = new ResizeObserver(size); ro.observe(fw); ro.observe(tw); }
+    return { update, resize: size };
+  }
+
+  root.Scene3D = { snapshot, openEditor, buildModel, frontCamera, topCamera, lockView };
 })(typeof window !== "undefined" ? window : globalThis);

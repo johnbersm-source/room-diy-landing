@@ -63,7 +63,7 @@
   const TARGETS = {
     living: { label: "거실", desc: "소파·TV 중심 공간", anchor: [390, 430] },
     master: { label: "안방", desc: "큰 침대와 옷장 중심", anchor: [340, 330] },
-    small: { label: "작은방", desc: "아이방·서재. 침대와 책상", anchor: [300, 300] },
+    small: { label: "일반 방", desc: "아이방·서재·원룸. 침대와 책상과 옷장", anchor: [300, 300] },
     room: { label: "방 전체", desc: "침대·책상·옷장이 한 방에", anchor: null },
   };
   const SHAPES = [
@@ -101,6 +101,23 @@
     }
     const r10 = (v) => Math.round(v / 10) * 10;
     return { W: Math.max(200, r10(W)), D: Math.max(250, r10(D)), sqm: a.sqm, pyeong: a.pyeong, target: t, shape: shape || "std" };
+  }
+
+  /* ---------- 방 크기 목록 (집 종류와 무관하게 방 하나의 크기로 고른다) ----------
+   * 기준점은 docs/RESEARCH_housing_and_monetization.md의 가정값(30평형 거실 390×430, 안방 340×330, 작은방 300×300)이고,
+   * 그보다 작거나 큰 쪽은 같은 비율로 늘이고 줄여 4단계로 나눈 **가정값**이다(공식 통계 아님, 줄자 입력이 우선). */
+  const ROOM_SIZES = {
+    living: [{ id: "s", label: "작은 편", W: 300, D: 340 }, { id: "m", label: "보통", W: 350, D: 390 }, { id: "l", label: "큰 편", W: 390, D: 430 }, { id: "xl", label: "아주 큼", W: 440, D: 500 }],
+    master: [{ id: "s", label: "작은 편", W: 270, D: 300 }, { id: "m", label: "보통", W: 300, D: 340 }, { id: "l", label: "큰 편", W: 340, D: 360 }, { id: "xl", label: "아주 큼", W: 380, D: 400 }],
+    small: [{ id: "s", label: "작은 편", W: 240, D: 270 }, { id: "m", label: "보통", W: 300, D: 300 }, { id: "l", label: "큰 편", W: 300, D: 360 }, { id: "xl", label: "아주 큼(원룸급)", W: 360, D: 450 }],
+  };
+  const sizesOf = (target) => ROOM_SIZES[target] || ROOM_SIZES.small;
+  function roomBySize(target, sizeId, shape) {
+    const t = ROOM_SIZES[target] ? target : "small", list = sizesOf(t), s0 = list.find((x) => x.id === sizeId) || list.find((x) => x.id === "m");
+    let W = s0.W, D = s0.D;
+    if (shape && shape !== "std") { const area = W * D, ratio = SHAPE_RATIO[shape]; W = Math.sqrt(area * ratio); D = area / W; }
+    const r10 = (v) => Math.round(v / 10) * 10;
+    return { W: Math.max(200, r10(W)), D: Math.max(250, r10(D)), target: t, shape: shape || "std", size: s0.id };
   }
 
   /* ---------- 가구 크기 선택지 (보편 규격, 출처: docs/RESEARCH_housing_and_monetization.md) ---------- */
@@ -311,8 +328,25 @@
   }
 
   /* ---------- 거실 (소파·TV장) ---------- */
-  function livingBase(Uc, sz, regions) {
+  // 두 사각형 사이의 가장 가까운 거리(겹치면 음수)
+  const rgap = (a, b) => Math.max(b.x - (a.x + a.w), a.x - (b.x + b.w), b.y - (a.y + a.h), a.y - (b.y + b.h));
+
+  // 거실 배치 평가: 겹침·방 밖·문 열림 공간은 오류, 통로·거리는 경고
+  function livingEval(ps, Uc, regions) {
+    const by = Object.fromEntries(ps.map((p) => [p.id, p])), ck = basicChecks(ps, Uc, regions);
+    let errs = ck.filter((k) => k.level === "error").length, warns = 0;
+    if (by.tv && by.table && by.sofa) {
+      const tvGap = rgap(by.tv, by.table), st = rgap(by.sofa, by.table), view = rgap(by.sofa, by.tv);
+      if (tvGap < 60) errs++; else if (tvGap < 80) warns++;
+      if (st < 30) errs++; else if (st > 60) warns++;
+      if (view < 180 || view > 320) warns++;
+    }
+    return { errs, warns };
+  }
+
+  function livingBase(Uc, sz, regions, fixed, locked) {
     const { W, D } = Uc;
+    fixed = fixed || []; locked = locked || new Set();
     const sofaD = S(95), sofaL = S(sz.sofa), tvD = S(45), tvL = S(sz.tvL), tw = S(sz.tableW), tl = S(sz.tableL);
     const sofaY = Math.max(100, Math.round((D - sofaL) / 2 + 40));
     const cy = sofaY + sofaL / 2;
@@ -323,11 +357,41 @@
     const gap = (tv.x - (sofa.x + sofa.w) - tw) / 2;
     const cy2 = sofa.y + sofa.h / 2;
     const table = R("table", "커피테이블", Math.round(sofa.x + sofa.w + gap), Math.round(cy2 - tl / 2), tw, tl);
-    return { sofa, tv, table, tw, tl };
+    const def = { sofa, tv, table, tw, tl };
+    // 입구·창 위치 때문에 기본 배치에 충돌이 생기면, 소파·TV장·테이블 위치를 자동으로 다시 정한다(이동 불가로 고른 가구는 그대로 둔다)
+    const e0 = livingEval([sofa, tv, table, ...fixed], Uc, rg), basicErr = basicChecks([sofa, tv, table, ...fixed], Uc, rg).filter((k) => k.level === "error").length;
+    if (basicErr === 0) return def; // 겹침·방 밖·문 열림 공간 충돌이 없으면 기본 배치를 그대로 쓴다
+    const ri = (v) => Math.round(v / 5) * 5, cl = (v, lo, hi) => Math.max(lo, Math.min(hi, v));
+    let best = null;
+    const tryPs = (sf, tvr, tb, bonus) => {
+      const cand = { sofa: locked.has("sofa") ? sofa : sf, tv: locked.has("tv") ? tv : tvr, table: locked.has("table") ? table : tb };
+      const ps = [cand.sofa, cand.tv, cand.table, ...fixed], e = livingEval(ps, Uc, rg);
+      const moved = ["sofa", "tv", "table"].reduce((t, k) => t + Math.abs(cand[k].x - def[k].x) + Math.abs(cand[k].y - def[k].y), 0);
+      const val = -e.errs * 1000 - e.warns * 100 - moved * 0.05 + bonus;
+      if (!best || val > best.val) best = { sofa: cand.sofa, tv: cand.tv, table: cand.table, val, errs: e.errs };
+    };
+    const vSteps = []; for (let y = 0; y <= D - sofaL; y += 20) vSteps.push(y);
+    const hSteps = []; for (let x = 0; x <= W - sofaL; x += 20) hSteps.push(x);
+    // 세로형: 소파가 왼쪽 벽·TV가 오른쪽 벽, 또는 반대
+    vSteps.forEach((y) => [[0, W - tvD, 0], [W - sofaD, 0, -20]].forEach(([sx, tx, bonus]) => {
+      const sf = R("sofa", "소파", sx, y, sofaD, sofaL), cy3 = y + sofaL / 2, ty = cl(ri(cy3 - tvL / 2), 0, D - tvL), tvr = R("tv", "TV장", tx, ty, tvD, tvL);
+      const l = Math.min(sf.x + sf.w, tvr.x + tvr.w), r = Math.max(sf.x, tvr.x), g2 = (Math.abs(tvr.x - sf.x) - (sf.x < tvr.x ? sf.w : tvr.w) - tw) / 2;
+      const tx0 = sf.x < tvr.x ? sf.x + sf.w + g2 : tvr.x + tvr.w + g2;
+      tryPs(sf, tvr, R("table", "커피테이블", Math.round(tx0), Math.round(cy3 - tl / 2), tw, tl), bonus);
+    }));
+    // 가로형: 소파가 맞은편 벽·TV가 입구 쪽 벽, 또는 반대
+    hSteps.forEach((x) => [[0, D - tvD, -30], [D - sofaD, 0, -40]].forEach(([sy, ty, bonus]) => {
+      const sf = R("sofa", "소파", x, sy, sofaL, sofaD), cx3 = x + sofaL / 2, tx = cl(ri(cx3 - tvL / 2), 0, W - tvL), tvr = R("tv", "TV장", tx, ty, tvL, tvD);
+      const g2 = (Math.abs(tvr.y - sf.y) - (sf.y < tvr.y ? sf.h : tvr.h) - tw) / 2;
+      const ty0 = sf.y < tvr.y ? sf.y + sf.h + g2 : tvr.y + tvr.h + g2;
+      tryPs(sf, tvr, R("table", "커피테이블", Math.round(cx3 - tl / 2), Math.round(ty0), tl, tw), bonus);
+    }));
+    return best && best.errs <= e0.errs ? { sofa: best.sofa, tv: best.tv, table: best.table, tw, tl } : def;
   }
 
-  function livingCandidates(Uc, regions, winC, sz, fixed, avoid) {
-    const b = livingBase(Uc, sz, avoid);
+  function livingCandidates(Uc, regions, winC, sz, fixed, avoid, drop, locked) {
+    drop = drop || new Set(); locked = locked || new Set();
+    const b = livingBase(Uc, sz, avoid, fixed, locked);
     const pref = winC.length ? centerOf(winC[0].rect) : { x: 12, y: 12 };
     const rugFor = (t) => R("rug", "러그", Math.round(t.x + t.w / 2 - 80), Math.round(t.y + t.h / 2 - 80), 160, 160, "rug");
     const list = [];
@@ -343,9 +407,11 @@
         items: Array.from(new Set(["rug", "ottoman", "lamp", ...LIVING_EXTRAS])), extraChecks: sp ? extra : [{ level: "warn", msg: "플로어 램프를 놓을 모서리 자리가 없음" }] });
     }
     {
-      const stGap = 35;
-      const table = R("table", "커피테이블", b.sofa.x + b.sofa.w + stGap, b.table.y, b.tw, b.tl);
-      const moved = Math.round(b.table.x - table.x);
+      const stGap = 35, sf = b.sofa, tb0 = b.table;
+      const horiz = Math.abs(sf.x + sf.w / 2 - (b.tv.x + b.tv.w / 2)) >= Math.abs(sf.y + sf.h / 2 - (b.tv.y + b.tv.h / 2)); // 소파–TV 사이가 가로 방향인지
+      const table = horiz ? R("table", "커피테이블", sf.x < b.tv.x ? sf.x + sf.w + stGap : sf.x - stGap - tb0.w, tb0.y, tb0.w, tb0.h)
+        : R("table", "커피테이블", tb0.x, sf.y < b.tv.y ? sf.y + sf.h + stGap : sf.y - stGap - tb0.h, tb0.w, tb0.h);
+      const moved = Math.round(Math.abs(tb0.x - table.x) + Math.abs(tb0.y - table.y));
       const pieces = [b.sofa, b.tv, table, ...fixed];
       const sp = freeSpot(35, 35, pieces, regions, Uc, { x: 10, y: Math.max(10, b.sofa.y - 45) });
       if (sp) pieces.push(R("lamp", "플로어 램프", sp.x, sp.y, 35, 35, "small"));
@@ -365,42 +431,53 @@
         extraChecks: chair ? [] : [{ level: "error", msg: "1인 의자를 놓을 자리가 없음" }] });
     }
     list.forEach((c) => {
+      c.pieces = c.pieces.filter((p) => !drop.has(p.id));
       const by = Object.fromEntries(c.pieces.map((p) => [p.id, p]));
       c.checks = [...basicChecks(c.pieces, Uc, regions), ...c.extraChecks];
-      const tvGap = by.tv.x - (by.table.x + by.table.w);
+      if (!(by.tv && by.table && by.sofa)) return;
+      const tvGap = rgap(by.tv, by.table);
       c.checks.push(lvl(tvGap, 60, 80, `TV장 앞 통로 ${Math.round(tvGap)}cm`, `TV장 앞 통로 ${Math.round(tvGap)}cm (최소 60cm 필요)`, `TV장 앞 통로 ${Math.round(tvGap)}cm (80cm 이상 권장)`));
-      const st = by.table.x - (by.sofa.x + by.sofa.w);
+      const st = rgap(by.sofa, by.table);
       c.checks.push(st < 30 ? { level: "error", msg: `소파–테이블 간격 ${Math.round(st)}cm (너무 좁음)` }
         : st > 60 ? { level: "warn", msg: `소파–테이블 간격 ${Math.round(st)}cm (손이 닿기 멀 수 있음)` }
         : { level: "ok", msg: `소파–테이블 간격 ${Math.round(st)}cm` });
-      const view = by.tv.x - (by.sofa.x + by.sofa.w);
+      const view = rgap(by.sofa, by.tv);
       c.checks.push(view < 180 || view > 320 ? { level: "warn", msg: `소파–TV 거리 ${Math.round(view)}cm (55인치 기준 약 180~320cm를 가정)` }
         : { level: "ok", msg: `소파–TV 거리 ${Math.round(view)}cm` });
-      if (by.rug && overlap(by.rug, by.tv)) c.checks.push({ level: "error", msg: "러그가 TV장에 닿음" });
+      if (by.rug && by.tv && overlap(by.rug, by.tv)) c.checks.push({ level: "error", msg: "러그가 TV장에 닿음" });
     });
     return { list, base: { sofa: b.sofa, tv: b.tv, table: b.table } };
   }
 
   /* ---------- 침대 계열 (원룸·안방·작은방) ---------- */
-  function bedBase(Uc, sz, hasDesk, regions) {
+  function bedBase(Uc, sz, hasDesk, regions, fixed, locked) {
     const { W, D } = Uc, rg = regions || [];
+    fixed = fixed || []; locked = locked || new Set();
     const bed = shiftClear(R("bed", "침대", 0, 10, S(sz.bed), S(200)), rg, Uc);
     const wardH = S(sz.ward);
     const ward = shiftClear(R("ward", "옷장", W - S(55), hasDesk ? 10 : D - wardH - 10, S(55), wardH), rg, Uc);
     const base = { bed, ward };
     if (hasDesk) base.desk = shiftClear(R("desk", "책상", W - S(60), ward.y + ward.h + 10, S(60), S(sz.desk)), rg, Uc);
+    // 입구·창 위치 때문에 기본 배치에 충돌이 생기면 침대·옷장·책상 위치를 자동으로 다시 정한다(이동 불가로 고른 가구는 그대로)
+    const ps0 = [bed, ward, ...(hasDesk ? [base.desk] : []), ...fixed];
+    const ck0 = [...basicChecks(ps0, Uc, rg), ...bedExtra(ps0, Uc)];
+    if (!ck0.some((k) => k.level === "error")) return base;
+    const bb = bestBedLayout(Uc, rg, sz, fixed, bed, ward, hasDesk ? base.desk : null, locked);
+    if (bb && bb.errs < ck0.filter((k) => k.level === "error").length) { base.bed = bb.bed; base.ward = bb.ward; if (hasDesk) base.desk = bb.desk; }
     return base;
   }
 
   // 침대 계열 추가 점검(침대 옆 통로·발치·옷장 앞·책상 앞)
   function bedExtra(pieces, Uc) {
     const { W, D } = Uc, by = Object.fromEntries(pieces.map((p) => [p.id, p])), solids = solidsOf(pieces), out = [];
-    const bd = by.bed, probe = R("probe", "", bd.x, bd.y + bd.h / 2, bd.w, bd.h / 2);
-    const open = Math.max(freeLeft(probe, solids), freeRight(probe, solids, W));
-    out.push(lvl(open, 40, 60, `침대 옆 통로 ${Math.round(open)}cm`, `침대 옆 통로 ${Math.round(open)}cm (최소 40cm 필요)`, `침대 옆 통로 ${Math.round(open)}cm (60cm 이상 권장)`));
-    const footSolids = solids.filter((x) => x.id !== "bookcase"), halfW = bd.w / 2;
-    const foot = Math.max(freeDown(R("f1", "", bd.x, bd.y, halfW, bd.h), footSolids, D), freeDown(R("f2", "", bd.x + halfW, bd.y, halfW, bd.h), footSolids, D));
-    if (foot < 60) out.push({ level: "warn", msg: `침대 발치 여유 ${Math.round(foot)}cm (60cm 이상 권장)` });
+    const bd = by.bed;
+    if (bd) {
+      const probe = R("probe", "", bd.x, bd.y + bd.h / 2, bd.w, bd.h / 2), open = Math.max(freeLeft(probe, solids), freeRight(probe, solids, W));
+      out.push(lvl(open, 40, 60, `침대 옆 통로 ${Math.round(open)}cm`, `침대 옆 통로 ${Math.round(open)}cm (최소 40cm 필요)`, `침대 옆 통로 ${Math.round(open)}cm (60cm 이상 권장)`));
+      const footSolids = solids.filter((x) => x.id !== "bookcase"), halfW = bd.w / 2;
+      const foot = Math.max(freeDown(R("f1", "", bd.x, bd.y, halfW, bd.h), footSolids, D), freeDown(R("f2", "", bd.x + halfW, bd.y, halfW, bd.h), footSolids, D));
+      if (foot < 60) out.push({ level: "warn", msg: `침대 발치 여유 ${Math.round(foot)}cm (60cm 이상 권장)` });
+    }
     const w = by.ward;
     if (w) { const f = frontClear(w, solids, Uc); out.push(lvl(f, 60, 80, `옷장 앞 여유 ${Math.round(f)}cm`, `옷장 앞 여유 ${Math.round(f)}cm (문 열림 최소 60cm 필요)`, `옷장 앞 여유 ${Math.round(f)}cm (80cm 이상 권장)`)); }
     const dk = by.desk;
@@ -408,37 +485,48 @@
     return out;
   }
 
-  // 책상 없는 방: 침대·옷장 위치를 여러 후보에서 찾아 문 열림 공간·통로 문제가 없는 배치를 고른다
-  function bestBedLayout(Uc, regions, sz, fixed, baseBed, baseWard) {
+  // 침대·옷장(·책상) 위치를 여러 후보에서 찾아 문 열림 공간·통로 문제가 없는 배치를 고른다. 이동 불가 가구는 기본 자리에 고정.
+  function bestBedLayout(Uc, regions, sz, fixed, baseBed, baseWard, baseDesk, locked) {
+    locked = locked || new Set();
     const { W, D } = Uc, bw = S(sz.bed), bl = S(200), wl = S(sz.ward), wd = S(55);
     const ri = (v) => Math.round(v / 5) * 5;
-    const beds = [];
+    let beds = [];
     [0, ri((W - bw) / 2), W - bw].forEach((x) => beds.push(R("bed", "침대", x, 0, bw, bl)));          // 머리를 맞은편 벽에 (세로)
     [0, ri((D - bw) / 2), D - bw].forEach((y) => { beds.push(R("bed", "침대", 0, y, bl, bw)); beds.push(R("bed", "침대", W - bl, y, bl, bw)); }); // 머리를 옆 벽에 (가로)
-    const wards = [baseWard, R("ward", "옷장", W - wd, 10, wd, wl), R("ward", "옷장", W - wd, D - wl - 10, wd, wl), R("ward", "옷장", 0, D - wl - 10, wd, wl),
+    let wards = [baseWard, R("ward", "옷장", W - wd, 10, wd, wl), R("ward", "옷장", W - wd, D - wl - 10, wd, wl), R("ward", "옷장", 0, D - wl - 10, wd, wl),
       R("ward", "옷장", 0, 10, wd, wl), R("ward", "옷장", W - wl - 10, 0, wl, wd), R("ward", "옷장", 10, 0, wl, wd), R("ward", "옷장", 10, D - wd, wl, wd), R("ward", "옷장", W - wl - 10, D - wd, wl, wd)];
+    let desks = [null];
+    if (baseDesk) {
+      const dl = S(sz.desk), dd = S(60); desks = [baseDesk];
+      for (let y = 0; y <= D - dl; y += 40) { desks.push(R("desk", "책상", W - dd, y, dd, dl)); desks.push(R("desk", "책상", 0, y, dd, dl)); }
+      for (let x = 0; x <= W - dl; x += 40) { desks.push(R("desk", "책상", x, 0, dl, dd)); desks.push(R("desk", "책상", x, D - dd, dl, dd)); }
+    }
+    if (locked.has("bed")) beds = [baseBed];
+    if (locked.has("ward")) wards = [baseWard];
+    if (locked.has("desk") && baseDesk) desks = [baseDesk];
     let best = null;
     beds.forEach((bed) => wards.forEach((ward) => {
-      const ps = [bed, ward, ...fixed];
-      const ck = [...basicChecks(ps, Uc, regions), ...bedExtra(ps, Uc)];
-      const errs = ck.filter((k) => k.level === "error").length, warns = ck.filter((k) => k.level === "warn").length;
-      const solids = solidsOf(ps), probe = R("probe", "", bed.x, bed.y + bed.h / 2, bed.w, bed.h / 2);
-      const sides = Math.min(60, freeLeft(probe, solids), freeRight(probe, solids, W));
-      const moved = Math.abs(bed.x - baseBed.x) + Math.abs(bed.y - baseBed.y) + Math.abs(ward.x - baseWard.x) + Math.abs(ward.y - baseWard.y);
-      const val = -errs * 1000 - warns * 100 + sides * 0.5 - moved * 0.05;
-      if (!best || val > best.val) best = { bed, ward, val, errs };
+      if (overlap(bed, ward)) return;
+      desks.forEach((desk) => {
+        if (desk && (overlap(desk, bed) || overlap(desk, ward))) return;
+        const ps = [bed, ward, ...(desk ? [desk] : []), ...fixed];
+        const ck = [...basicChecks(ps, Uc, regions), ...bedExtra(ps, Uc)];
+        const errs = ck.filter((k) => k.level === "error").length, warns = ck.filter((k) => k.level === "warn").length;
+        const solids = solidsOf(ps), probe = R("probe", "", bed.x, bed.y + bed.h / 2, bed.w, bed.h / 2);
+        const sides = Math.min(60, freeLeft(probe, solids), freeRight(probe, solids, W));
+        const moved = Math.abs(bed.x - baseBed.x) + Math.abs(bed.y - baseBed.y) + Math.abs(ward.x - baseWard.x) + Math.abs(ward.y - baseWard.y) + (desk && baseDesk ? Math.abs(desk.x - baseDesk.x) + Math.abs(desk.y - baseDesk.y) : 0);
+        const val = -errs * 1000 - warns * 100 + sides * 0.5 - moved * 0.05;
+        if (!best || val > best.val) best = { bed, ward, desk, val, errs };
+      });
     }));
     return best;
   }
 
-  function bedCandidates(Uc, regions, winC, sz, hasDesk, fixed, avoid) {
+  function bedCandidates(Uc, regions, winC, sz, hasDesk, fixed, avoid, drop, locked) {
+    drop = drop || new Set(); locked = locked || new Set();
     const { W, D } = Uc;
-    const b = bedBase(Uc, sz, hasDesk, avoid);
-    let { bed, ward, desk } = b;
-    if (!hasDesk) { // 기본 배치가 문 열림 공간·옷장 앞 여유 등에서 오류가 나면, 오류 없는 가장 가까운 배치를 기준으로 삼는다
-      const ck0 = [...basicChecks([bed, ward, ...fixed], Uc, avoid), ...bedExtra([bed, ward, ...fixed], Uc)];
-      if (ck0.some((k) => k.level === "error")) { const bb = bestBedLayout(Uc, avoid, sz, fixed, bed, ward); if (!bb.errs) { bed = bb.bed; ward = bb.ward; b.bed = bed; b.ward = ward; } }
-    }
+    const b = bedBase(Uc, sz, hasDesk, avoid, fixed, locked);
+    const { bed, ward, desk } = b;
     const base = (hasDesk ? [bed, ward, desk] : [bed, ward]).concat(fixed);
     const pref = winC.length ? centerOf(winC[0].rect) : { x: W / 2, y: 12 };
     const nsz = S(40);
@@ -473,7 +561,7 @@
         changes: ["책상을 창 가까이로 옮겨 자연광을 쓰도록 배치", "옷장 위치를 조정해 책상 앞 의자 공간(90cm 이상)을 확보", "기존 책상 자리는 비워 통로로 사용"],
         items: [], extraChecks: chosen ? [] : [{ level: "warn", msg: "의자 공간 90cm를 확보하는 책상 자리를 찾지 못해 가장 가까운 자리로 표시" }] });
     } else {
-      const bb = bestBedLayout(Uc, avoid, sz, fixed, bed, ward);
+      const bb = bestBedLayout(Uc, avoid, sz, fixed, bed, ward, null, locked);
       const same = Math.abs(bb.bed.x - bed.x) + Math.abs(bb.bed.y - bed.y) + Math.abs(bb.ward.x - ward.x) + Math.abs(bb.ward.y - ward.y) < 1;
       list.push({ id: "B", title: "재배치 0원형", cost: "0원 (기존 가구 이동)", pieces: [bb.bed, bb.ward, ...fixed],
         changes: same ? ["지금 배치가 이 방에서는 가장 무난해요(문 열림 공간과 통로를 이미 확보)"] : ["침대와 옷장 위치를 조정해 문 열림 공간과 침대 옆 통로를 확보", "옷장 앞 여유 공간(60cm 이상)을 확보"],
@@ -494,6 +582,7 @@
         extraChecks: found ? [] : [{ level: "error", msg: "소형 책상을 놓을 자리가 없음" }] });
     }
     list.forEach((c) => {
+      c.pieces = c.pieces.filter((p) => !drop.has(p.id));
       c.checks = [...basicChecks(c.pieces, Uc, regions), ...c.extraChecks, ...bedExtra(c.pieces, Uc)];
     });
     return { list, base: b };
@@ -522,7 +611,12 @@
 
   function normalize(opts) {
     const o = Object.assign({ housing: "apt", target: "living", door: "sliding", locked: [], budget: null, rental: false }, opts || {});
+    // 침대·옷장·소파·TV장·테이블 크기를 0으로 주면 "없음": 계산은 기본 크기로 하되 결과에서 그 가구를 뺀다
+    const NONE = { bed: ["bed", "ns"], ward: ["ward"], sofa: ["sofa"], tvL: ["tv"], tableL: ["table"], tableW: ["table"] };
+    o.drop = new Set(); const raw = (opts && opts.sizes) || {};
+    Object.keys(NONE).forEach((k) => { if (raw[k] === 0) NONE[k].forEach((id) => o.drop.add(id)); });
     o.sizes = Object.assign({}, DEFAULT_SIZES, o.sizes || {});
+    Object.keys(NONE).forEach((k) => { if (!(o.sizes[k] > 0)) o.sizes[k] = DEFAULT_SIZES[k]; });
     o.view = Object.assign({}, DEFAULT_VIEW, o.view || {});
     o.view.obstacle = Object.assign({}, DEFAULT_VIEW.obstacle, (opts && opts.view && opts.view.obstacle) || {});
     return o;
@@ -551,7 +645,7 @@
       fixed = [Object.assign(R("pillar", "기둥·돌출", 0, 0, osz, osz, "fixed"), fr.toCanon({ x: rx, y: ry, w: osz, h: osz }))];
     }
     const avoid = regions.concat(fixed.map((f) => ({ label: "고정 장애물", rect: f })));
-    return { opts, family, hasDesk, U, fr, Uc, winReal, winC, regions, target, fixed, avoid, winW };
+    return { opts, family, hasDesk, U, fr, Uc, winReal, winC, regions, target, fixed, avoid, winW, drop: opts.drop };
   }
 
   function finalize(c, ctx) {
@@ -563,11 +657,12 @@
 
   function candidates(room, optsIn) {
     const ctx = setup(room, optsIn), { opts } = ctx;
-    const built = ctx.family === "living" ? livingCandidates(ctx.Uc, ctx.regions, ctx.winC, opts.sizes, ctx.fixed, ctx.avoid) : bedCandidates(ctx.Uc, ctx.regions, ctx.winC, opts.sizes, ctx.hasDesk, ctx.fixed, ctx.avoid);
+    const built = ctx.family === "living" ? livingCandidates(ctx.Uc, ctx.regions, ctx.winC, opts.sizes, ctx.fixed, ctx.avoid, ctx.drop, new Set(opts.locked || [])) : bedCandidates(ctx.Uc, ctx.regions, ctx.winC, opts.sizes, ctx.hasDesk, ctx.fixed, ctx.avoid, ctx.drop, new Set(opts.locked || []));
     const locked = new Set(opts.locked || []);
     built.list.forEach((c) => {
       // 방 종류에 맞지 않는 품목은 뺀다(예: 안방에 무타공 선반·문걸이는 보통 쓰지 않는다)
-      const ban = ITEM_BAN[ctx.target] || []; c.items = c.items.filter((k) => !ban.includes(k));
+      const ban = (ITEM_BAN[ctx.target] || []).concat(ctx.drop.has("bed") ? ["nightstand", "bedding", "rugSmall"] : [], ctx.drop.has("sofa") ? ["cushion"] : []);
+      c.items = c.items.filter((k) => !ban.includes(k));
       c.blocked = false; c.blockedBy = [];
       Object.values(built.base).forEach((bp) => {
         if (!bp || !bp.id || !locked.has(bp.id)) return;
@@ -597,9 +692,9 @@
   function currentScene(room, optsIn) {
     const ctx = setup(room, optsIn);
     let pieces;
-    if (ctx.family === "living") { const b = livingBase(ctx.Uc, ctx.opts.sizes, ctx.avoid); pieces = [b.sofa, b.tv, b.table]; }
-    else { const b = bedBase(ctx.Uc, ctx.opts.sizes, ctx.hasDesk, ctx.avoid); pieces = ctx.hasDesk ? [b.bed, b.ward, b.desk] : [b.bed, b.ward]; }
-    pieces = pieces.concat(ctx.fixed);
+    if (ctx.family === "living") { const b = livingBase(ctx.Uc, ctx.opts.sizes, ctx.avoid, ctx.fixed, new Set(ctx.opts.locked || [])); pieces = [b.sofa, b.tv, b.table]; }
+    else { const b = bedBase(ctx.Uc, ctx.opts.sizes, ctx.hasDesk, ctx.avoid, ctx.fixed, new Set(ctx.opts.locked || [])); pieces = ctx.hasDesk ? [b.bed, b.ward, b.desk] : [b.bed, b.ward]; }
+    pieces = pieces.filter((p) => !ctx.drop.has(p.id)).concat(ctx.fixed);
     const c = { title: "현재 구조", pieces, checks: [] };
     finalize(c, ctx);
     return c;
@@ -714,7 +809,7 @@
 
   const api = { PAD, ROOM_SHRINK, PYEONG, HOUSING, APT_STRUCTURES, APT_ERAS, aptPlanDefault, TARGETS, SHAPES, SIZE_OPTIONS, DEFAULT_SIZES, TARGET_DEFAULTS,
     WALLS, BIG_WALLS, DOOR_POS, DEFAULT_VIEW, MERCHANTS, FIXED_PROMPT, ITEM,
-    WIN_SIZES, OBSTACLES, CORNERS, roomFor, suggestSizes, candidates, currentScene, anyApplicable, suggestions, buildQuote, svg, score, planPurchase, usableRoom };
+    WIN_SIZES, OBSTACLES, CORNERS, roomFor, ROOM_SIZES, roomBySize, suggestSizes, candidates, currentScene, anyApplicable, suggestions, buildQuote, svg, score, planPurchase, usableRoom };
   if (typeof module !== "undefined" && module.exports) module.exports = api;
   else root.LayoutEngine = api;
 })(typeof window !== "undefined" ? window : globalThis);
