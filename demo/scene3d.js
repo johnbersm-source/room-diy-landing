@@ -11,12 +11,24 @@
   const WALL_H = 240, FRONT_BG = 0xe9e5dd, TOP_BG = 0xf7f5f0;
   const PAL = { wood: 0xc9a27a, woodDark: 0x8a6a4a, white: 0xf3f0ea, grey: 0xaab0b8, greyDark: 0x6e747c, sage: 0x9db39a, cream: 0xeadfcb, black: 0x2b2b2f, warm: 0xffe2a8, green: 0x4f8a55, blue: 0x7ea6c4, rose: 0xd8a7a0 };
   const mats = {};
-  const M = (c) => mats[c] || (mats[c] = new T.MeshLambertMaterial({ color: c }));
-  const EDGE = new T.LineBasicMaterial({ color: 0x5b5348 });
-  function B(parent, w, h, d, color, x, y, z) { const geo = new T.BoxGeometry(w, h, d), m = new T.Mesh(geo, M(color)); m.position.set(x || 0, (y || 0) + h / 2, z || 0); if (w > 6 && h > 3 && d > 3) m.add(new T.LineSegments(new T.EdgesGeometry(geo), EDGE)); parent.add(m); return m; }
-  function C(parent, rt, rb, h, color, x, y, z, seg) { const m = new T.Mesh(new T.CylinderGeometry(rt, rb, h, seg || 20), M(color)); m.position.set(x || 0, (y || 0) + h / 2, z || 0); parent.add(m); return m; }
-  function S(parent, r, color, x, y, z) { const m = new T.Mesh(new T.SphereGeometry(r, 14, 10), M(color)); m.position.set(x, y, z); parent.add(m); return m; }
-  const glow = (c) => new T.MeshBasicMaterial({ color: c });
+  const lin = (c) => new T.Color(c).convertSRGBToLinear(); // 출력을 sRGB로 하므로 색은 선형으로 바꿔 넣는다
+  const M = (c, rough) => { const k = c + ":" + (rough || 0); return mats[k] || (mats[k] = new T.MeshStandardMaterial({ color: lin(c), roughness: rough == null ? 0.82 : rough, metalness: 0 })); };
+  const glow = (c) => new T.MeshBasicMaterial({ color: lin(c) });
+  const shade = (m) => { m.castShadow = true; m.receiveShadow = true; return m; };
+  // 모서리를 살짝 둥글린 상자(밑면이 y=0, 중심이 x=z=0). 작은 물건은 그냥 상자.
+  const rbCache = {};
+  function rgeo(w, h, d, r) {
+    const k = [w, h, d, r].map((v) => Math.round(v * 10)).join("_"); if (rbCache[k]) return rbCache[k];
+    const x = w / 2, y = d / 2, sh = new T.Shape(); sh.moveTo(-x + r, -y); sh.lineTo(x - r, -y); sh.quadraticCurveTo(x, -y, x, -y + r); sh.lineTo(x, y - r); sh.quadraticCurveTo(x, y, x - r, y); sh.lineTo(-x + r, y); sh.quadraticCurveTo(-x, y, -x, y - r); sh.lineTo(-x, -y + r); sh.quadraticCurveTo(-x, -y, -x + r, -y);
+    const bv = Math.min(0.9, r * 0.4), g = new T.ExtrudeGeometry(sh, { depth: Math.max(0.1, h - bv * 2), bevelEnabled: true, bevelThickness: bv, bevelSize: bv * 0.8, bevelSegments: 2, curveSegments: 4 });
+    g.rotateX(-Math.PI / 2); g.translate(0, bv, 0); g.computeVertexNormals(); return (rbCache[k] = g);
+  }
+  function B(parent, w, h, d, color, x, y, z, rough) {
+    const r = Math.min(2.4, w / 5, d / 5, h / 3), geo = w > 9 && d > 9 && h > 4 && r > 0.8 ? rgeo(w, h, d, r) : new T.BoxGeometry(w, h, d);
+    const m = shade(new T.Mesh(geo, M(color, rough))); m.position.set(x || 0, (y || 0) + (geo.type === "BoxGeometry" ? h / 2 : 0), z || 0); parent.add(m); return m;
+  }
+  function C(parent, rt, rb, h, color, x, y, z, seg, rough) { const m = shade(new T.Mesh(new T.CylinderGeometry(rt, rb, h, seg || 24), M(color, rough))); m.position.set(x || 0, (y || 0) + h / 2, z || 0); parent.add(m); return m; }
+  function S(parent, r, color, x, y, z) { const m = shade(new T.Mesh(new T.SphereGeometry(r, 20, 14), M(color))); m.position.set(x, y, z); parent.add(m); return m; }
 
   /* ---------- 모델 (원점 = 바닥 중심, 앞면 = +Z, 너비 = X, 깊이 = Z) ---------- */
   const BUILD = {
@@ -74,10 +86,16 @@
 
   /* ---------- 방 (바닥·벽·창·문) ---------- */
   function plankTexture() {
-    const c = document.createElement("canvas"); c.width = 256; c.height = 256; const x = c.getContext("2d");
-    x.fillStyle = "#d8c6aa"; x.fillRect(0, 0, 256, 256);
-    for (let i = 0; i < 8; i++) { x.fillStyle = i % 2 ? "#d2bfa1" : "#dccbb0"; x.fillRect(0, i * 32, 256, 32); x.fillStyle = "rgba(90,60,30,.25)"; x.fillRect(0, i * 32, 256, 1.5); x.fillRect(((i * 97) % 256), i * 32, 1.5, 32); }
-    const t = new T.CanvasTexture(c); t.wrapS = t.wrapT = T.RepeatWrapping; return t;
+    const c = document.createElement("canvas"); c.width = 512; c.height = 512; const x = c.getContext("2d"); const rnd = (() => { let v = 7; return () => (v = (v * 16807) % 2147483647) / 2147483647; })();
+    x.fillStyle = "#d9c3a0"; x.fillRect(0, 0, 512, 512);
+    for (let i = 0; i < 8; i++) {
+      const y0 = i * 64, off = rnd() * 512, base = 205 + Math.floor(rnd() * 18);
+      for (let seg = 0; seg < 2; seg++) { const sx = (off + seg * 256) % 512; x.fillStyle = `rgb(${base},${base - 22},${base - 52})`; x.fillRect(sx, y0, 256, 64); if (sx + 256 > 512) x.fillRect(sx - 512, y0, 256, 64);
+        for (let g = 0; g < 14; g++) { x.strokeStyle = `rgba(110,75,40,${0.05 + rnd() * 0.08})`; x.lineWidth = 1; x.beginPath(); const gy = y0 + 4 + rnd() * 56; x.moveTo(sx, gy); x.bezierCurveTo(sx + 80, gy + rnd() * 5 - 2, sx + 170, gy + rnd() * 5 - 2, sx + 256, gy); x.stroke(); }
+        x.fillStyle = "rgba(80,55,30,.35)"; x.fillRect(sx, y0, 1.5, 64); }
+      x.fillStyle = "rgba(80,55,30,.35)"; x.fillRect(0, y0, 512, 1.6);
+    }
+    const t = new T.CanvasTexture(c); t.wrapS = t.wrapT = T.RepeatWrapping; t.encoding = T.sRGBEncoding; t.anisotropy = 4; return t;
   }
   let _plank = null;
   function textSprite(text, w, h, color) {
@@ -85,29 +103,41 @@
     x.fillStyle = "rgba(255,255,255,0)"; x.fillRect(0, 0, c.width, c.height); x.fillStyle = color || "#b25b00"; x.textAlign = "center"; x.textBaseline = "middle";
     const lines = String(text).split("\n"); let fs = Math.min(64, Math.floor(c.height * 0.9 / (lines.length * 1.15))); x.font = `bold ${fs}px sans-serif`; const mw = Math.max(...lines.map((ln) => x.measureText(ln).width)); if (mw > c.width * 0.92) { fs = Math.floor(fs * c.width * 0.92 / mw); x.font = `bold ${fs}px sans-serif`; }
     lines.forEach((ln, i) => x.fillText(ln, c.width / 2, c.height / 2 + (i - (lines.length - 1) / 2) * fs * 1.15));
-    const t = new T.CanvasTexture(c), m = new T.Mesh(new T.PlaneGeometry(w, h), new T.MeshBasicMaterial({ map: t, transparent: true, depthWrite: false }));
+    const t = new T.CanvasTexture(c); t.encoding = T.sRGBEncoding; const m = new T.Mesh(new T.PlaneGeometry(w, h), new T.MeshBasicMaterial({ map: t, transparent: true, depthWrite: false }));
     m.rotation.x = -Math.PI / 2; return m;
+  }
+  function skyTexture() {
+    const c = document.createElement("canvas"); c.width = 64; c.height = 128; const x = c.getContext("2d"), g = x.createLinearGradient(0, 0, 0, 128);
+    g.addColorStop(0, "#bfe0ff"); g.addColorStop(0.55, "#eaf5ff"); g.addColorStop(0.75, "#cfe2c4"); g.addColorStop(1, "#a9c79b"); x.fillStyle = g; x.fillRect(0, 0, 64, 128);
+    const t = new T.CanvasTexture(c); t.encoding = T.sRGBEncoding; return t;
   }
   function buildRoom(U, windows, door) {
     const g = new T.Group(); _plank = _plank || plankTexture();
-    const fl = _plank.clone(); fl.needsUpdate = true; fl.repeat.set(U.W / 120, U.D / 120);
-    const floor = new T.Mesh(new T.PlaneGeometry(U.W, U.D), new T.MeshLambertMaterial({ map: fl })); floor.rotation.x = -Math.PI / 2; floor.position.set(U.W / 2, 0, U.D / 2); g.add(floor);
-    const wallMat = M(0xfbf8f2), TH = 6;
-    const far = new T.Mesh(new T.BoxGeometry(U.W + TH * 2, WALL_H, TH), wallMat); far.position.set(U.W / 2, WALL_H / 2, -TH / 2); g.add(far);
-    const left = new T.Mesh(new T.BoxGeometry(TH, WALL_H, U.D), wallMat); left.position.set(-TH / 2, WALL_H / 2, U.D / 2); g.add(left);
-    const right = new T.Mesh(new T.BoxGeometry(TH, WALL_H, U.D), wallMat); right.position.set(U.W + TH / 2, WALL_H / 2, U.D / 2); g.add(right);
-    const near = new T.Mesh(new T.BoxGeometry(U.W + TH * 2, WALL_H, TH), wallMat); near.position.set(U.W / 2, WALL_H / 2, U.D + TH / 2); near.layers.set(1); g.add(near); // 위에서 볼 때만
+    const fl = _plank.clone(); fl.needsUpdate = true; fl.repeat.set(U.W / 150, U.D / 150);
+    const floor = new T.Mesh(new T.PlaneGeometry(U.W, U.D), new T.MeshStandardMaterial({ map: fl, roughness: 0.55, metalness: 0 })); floor.rotation.x = -Math.PI / 2; floor.position.set(U.W / 2, 0, U.D / 2); floor.receiveShadow = true; g.add(floor);
+    const wallMat = M(0xf1ece3, 0.95), TH = 6;
+    const wall = (w, h, d, x, y, z, layer) => { const m = new T.Mesh(new T.BoxGeometry(w, h, d), wallMat); m.position.set(x, y, z); m.receiveShadow = true; if (layer != null) m.layers.set(layer); g.add(m); return m; };
+    wall(U.W + TH * 2, WALL_H, TH, U.W / 2, WALL_H / 2, -TH / 2);
+    wall(TH, WALL_H, U.D, -TH / 2, WALL_H / 2, U.D / 2);
+    wall(TH, WALL_H, U.D, U.W + TH / 2, WALL_H / 2, U.D / 2);
+    wall(U.W + TH * 2, WALL_H, TH, U.W / 2, WALL_H / 2, U.D + TH / 2, 1); // 위에서 볼 때만
+    // 걸레받이
+    const bb = M(0xffffff, 0.7), base = (w, d, x, z) => { const m = new T.Mesh(new T.BoxGeometry(w, 8, d), bb); m.position.set(x, 4, z); m.receiveShadow = true; g.add(m); };
+    base(U.W, 1.6, U.W / 2, 0.8); base(1.6, U.D, 0.8, U.D / 2); base(1.6, U.D, U.W - 0.8, U.D / 2);
+    // 천장(정면에서 볼 때만)
+    const ceil = new T.Mesh(new T.PlaneGeometry(U.W, U.D), M(0xffffff, 1)); ceil.rotation.x = Math.PI / 2; ceil.position.set(U.W / 2, WALL_H, U.D / 2); ceil.layers.set(2); g.add(ceil);
     (windows || []).forEach((w) => {
       const ww = Math.min(w.w, (w.wall === "far" ? U.W : U.D) - 30), p = L.wallPlace(w.wall, 0.5, U, ww, 4);
-      const wg = new T.Group(); B(wg, ww + 8, 150, 3, 0xffffff, 0, 0, 0);
-      const glass = new T.Mesh(new T.PlaneGeometry(ww, 142), new T.MeshBasicMaterial({ color: 0xcfe8ff })); glass.position.set(0, 75, 1.8); wg.add(glass);
-      B(wg, 2, 142, 3.4, 0xffffff, 0, 4, 0.2);
-      wg.position.set(p.cx, 70, p.cz + (w.wall === "far" ? 0 : 0)); wg.rotation.y = p.rot; g.add(wg);
+      const wg = new T.Group(); B(wg, ww + 10, 154, 3, 0xffffff, 0, 0, 0, 0.6);
+      const sky = skyTexture(), glass = new T.Mesh(new T.PlaneGeometry(ww, 144), new T.MeshBasicMaterial({ map: sky })); glass.position.set(0, 77, 1.9); wg.add(glass);
+      B(wg, 2.4, 144, 3.4, 0xffffff, 0, 5, 0.3, 0.6); B(wg, ww, 2.4, 3.4, 0xffffff, 0, 76, 0.3, 0.6);
+      B(wg, ww + 16, 3, 10, 0xffffff, 0, 70, 3, 0.6); // 창턱
+      wg.position.set(p.cx, 70, p.cz); wg.rotation.y = p.rot; g.add(wg);
     });
     // 문 열림 공간(주황, 위에서 볼 때 강조) + 문 표시
-    const dr = L.doorRect(U, door), zone = new T.Mesh(new T.PlaneGeometry(dr.w, dr.h), new T.MeshBasicMaterial({ color: 0xff7a00, transparent: true, opacity: 0.5 }));
-    zone.rotation.x = -Math.PI / 2; zone.position.set(dr.x + dr.w / 2, 0.6, dr.y + dr.h / 2); zone.userData.hideForAI = true; g.add(zone);
-    const zb = new T.LineSegments(new T.EdgesGeometry(new T.PlaneGeometry(dr.w, dr.h)), new T.LineBasicMaterial({ color: 0xc85800 })); zb.rotation.x = -Math.PI / 2; zb.position.set(dr.x + dr.w / 2, 0.9, dr.y + dr.h / 2); zb.layers.set(1); zb.userData.hideForAI = true; g.add(zb);
+    const dr = L.doorRect(U, door), zone = new T.Mesh(new T.PlaneGeometry(dr.w, dr.h), new T.MeshBasicMaterial({ color: lin(0xff7a00), transparent: true, opacity: 0.5 }));
+    zone.rotation.x = -Math.PI / 2; zone.position.set(dr.x + dr.w / 2, 0.6, dr.y + dr.h / 2); zone.userData.hideForAI = true; zone.layers.set(1); g.add(zone);
+    const zb = new T.LineSegments(new T.EdgesGeometry(new T.PlaneGeometry(dr.w, dr.h)), new T.LineBasicMaterial({ color: lin(0xc85800) })); zb.rotation.x = -Math.PI / 2; zb.position.set(dr.x + dr.w / 2, 0.9, dr.y + dr.h / 2); zb.layers.set(1); zb.userData.hideForAI = true; g.add(zb);
     const lbl = textSprite("문 열림 공간\n(비워 두세요)", dr.w, dr.h * 0.7, "#8a3d00"); lbl.position.set(dr.x + dr.w / 2, 0.8, dr.y + dr.h / 2); lbl.layers.set(1); lbl.userData.hideForAI = true; g.add(lbl);
     const doorBar = new T.Mesh(new T.BoxGeometry(80, 4, 5), M(0x8a6a4a)); doorBar.position.set(dr.x + dr.w / 2, 2, U.D + 1); doorBar.layers.set(1); doorBar.userData.hideForAI = true; g.add(doorBar);
     return g;
@@ -116,7 +146,7 @@
   /* ---------- 카메라 ---------- */
   function frontCamera(U, door, aspect) {
     const cam = new T.PerspectiveCamera(74, aspect, 5, 3000), dx = door === "left" ? 50 : door === "center" ? U.W / 2 : U.W - 50;
-    cam.position.set(dx, 135, U.D + 70); cam.lookAt(U.W / 2, 85, 0); return cam;
+    cam.position.set(dx, 135, U.D + 70); cam.lookAt(U.W / 2, 85, 0); cam.layers.enable(2); return cam;
   }
   function topCamera(U, aspect) {
     const m = 25, hw = U.W / 2 + m, hh = U.D / 2 + m; let w = hw, h = hh;
@@ -124,10 +154,17 @@
     const cam = new T.OrthographicCamera(-w, w, h, -h, 10, 3000); cam.position.set(U.W / 2, 1000, U.D / 2); cam.up.set(0, 0, -1); cam.lookAt(U.W / 2, 0, U.D / 2); cam.layers.enable(1); return cam;
   }
   function newScene(U, windows, door, bg) {
-    const sc = new T.Scene(); sc.background = new T.Color(bg);
-    sc.add(new T.HemisphereLight(0xffffff, 0xa89c8c, 0.82)); const dl = new T.DirectionalLight(0xffffff, 0.4); dl.position.set(U.W * 0.3, 600, U.D * 1.2); sc.add(dl);
+    const sc = new T.Scene(); sc.background = lin(bg);
+    sc.add(new T.HemisphereLight(0xfff6ea, 0xb5a591, 0.5));
+    // 창 쪽에서 들어오는 부드러운 햇빛(그림자가 생긴다). 창이 없으면 위에서
+    const win = (windows || [])[0], cx = U.W / 2, cz = U.D / 2, dl = new T.DirectionalLight(0xfff1dc, 0.95);
+    const from = win ? (win.wall === "far" ? [cx + U.W * 0.15, 330, -260] : win.wall === "left" ? [-260, 330, cz - U.D * 0.15] : [U.W + 260, 330, cz - U.D * 0.15]) : [cx, 520, cz + 60];
+    dl.position.set(from[0], from[1], from[2]); dl.target.position.set(cx, 0, cz); sc.add(dl); sc.add(dl.target);
+    dl.castShadow = true; dl.shadow.mapSize.set(1024, 1024); const R = Math.max(U.W, U.D) * 0.85; Object.assign(dl.shadow.camera, { left: -R, right: R, top: R, bottom: -R, near: 50, far: 1400 }); dl.shadow.bias = -0.0006; dl.shadow.radius = 4; dl.shadow.camera.updateProjectionMatrix();
     sc.add(buildRoom(U, windows, door)); return sc;
   }
+  // 모든 화면 공통: 부드러운 그림자·색 보정
+  function prep(r) { r.shadowMap.enabled = true; r.shadowMap.type = T.PCFSoftShadowMap; r.outputEncoding = T.sRGBEncoding; r.toneMapping = T.ACESFilmicToneMapping; r.toneMappingExposure = 0.92; return r; }
 
   /* ---------- 객체 그룹 ---------- */
   function placeGroup(g, o) {
@@ -159,7 +196,7 @@
   /* ---------- 정지 이미지(카드·AI 입력용) ---------- */
   let shared = null;
   function sharedRenderer(w, h) {
-    if (!shared) { const cv = document.createElement("canvas"); shared = new T.WebGLRenderer({ canvas: cv, antialias: true, preserveDrawingBuffer: true }); }
+    if (!shared) { const cv = document.createElement("canvas"); shared = prep(new T.WebGLRenderer({ canvas: cv, antialias: true, preserveDrawingBuffer: true })); }
     shared.setPixelRatio(1); shared.setSize(w, h, false); return shared;
   }
   function hideAI(sc, hide) { sc.traverse((m) => { if (m.userData && m.userData.hideForAI) m.visible = !hide; }); }
@@ -200,7 +237,7 @@
     m.style.display = "flex";
     const sc = newScene(U, opts.room.windows, opts.room.door, FRONT_BG), scTop = sc; // 같은 장면을 두 시점이 함께 쓴다
     const fw = m.querySelector("#s3Front"), tw = m.querySelector("#s3Top");
-    const fr = new T.WebGLRenderer({ antialias: true, preserveDrawingBuffer: true }), tr = new T.WebGLRenderer({ antialias: true, preserveDrawingBuffer: true });
+    const fr = prep(new T.WebGLRenderer({ antialias: true, preserveDrawingBuffer: true })), tr = prep(new T.WebGLRenderer({ antialias: true, preserveDrawingBuffer: true }));
     const topAspect = Math.min(1.6, Math.max(0.75, (U.W + 50) / (U.D + 50))); tw.style.aspectRatio = topAspect + "";
     fw.appendChild(fr.domElement); tw.appendChild(tr.domElement);
     [fr, tr].forEach((r) => { r.domElement.style.cssText = "width:100%;height:100%;display:block;touch-action:none"; });
@@ -303,7 +340,7 @@
     el.innerHTML = `<div class="mut" style="font-size:12px">문에서 본 모습 (가구를 눌러 고르세요)</div><div class="lvf" style="width:100%;aspect-ratio:4/3;border-radius:10px;overflow:hidden"></div>
       <div class="mut" style="font-size:12px;margin-top:6px">위에서 본 모습 <span style="color:#b25b00">(주황색 = 문 열림 공간)</span></div><div class="lvt" style="width:100%;border-radius:10px;overflow:hidden"></div>`;
     const fw = el.querySelector(".lvf"), tw = el.querySelector(".lvt");
-    const fr = new T.WebGLRenderer({ antialias: true }), tr = new T.WebGLRenderer({ antialias: true });
+    const fr = prep(new T.WebGLRenderer({ antialias: true })), tr = prep(new T.WebGLRenderer({ antialias: true }));
     fw.appendChild(fr.domElement); tw.appendChild(tr.domElement); [fr, tr].forEach((r) => { r.domElement.style.cssText = "width:100%;height:100%;display:block;touch-action:manipulation"; });
     let sc = null, U = null, objs = [], locked = new Set(), sig = "", cams = null, marks = null;
     const views = [{ r: fr, el: fw }, { r: tr, el: tw }];

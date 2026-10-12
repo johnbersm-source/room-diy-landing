@@ -120,6 +120,8 @@ textarea{width:100%;font:12px/1.5 ui-monospace,monospace;background:var(--bg);co
 </style>
 </head>
 <body>
+<div id="errBanner" hidden style="background:#fff3cd;color:#664d03;padding:10px 14px;font-size:14px;text-align:center">화면을 불러오다 문제가 생겼어요. 새로고침(또는 다른 브라우저)으로 다시 열어보세요. 계속되면 알려주세요. <button type="button" onclick="location.reload()" style="margin-left:6px">새로고침</button></div>
+<noscript><div style="padding:14px;text-align:center">이 앱은 자바스크립트가 필요해요. 브라우저 설정에서 켜주세요.</div></noscript>
 <div class="notice">프로토타입입니다. 사진은 이 기기에서만 미리보기되며 서버로 전송되지 않습니다.</div>
 <main>
   <div id="myQuotes"></div>
@@ -201,20 +203,21 @@ textarea{width:100%;font:12px/1.5 ui-monospace,monospace;background:var(--bg);co
   <section id="quote" hidden></section>
   <p class="mut" style="margin-top:24px">AI 이미지는 참고용이며 실제와 다를 수 있습니다. 가구 치수·간격·가격은 일반 가정값이며 실측과 판매처 가격으로 확인하세요. 상품 링크는 각 쇼핑몰의 검색 링크로, 제휴 승인 전이라 수수료가 없는 임시 링크입니다. 제휴가 시작되면 화면 상단과 견적서에 대가성 문구를 표시합니다.</p>
 </main>
-<script src="layout.js?v=1791702923"></script>
-<script src="samples.js?v=1791702923"></script>
-<script src="editor.js?v=1791702923"></script>
-<script src="board.js?v=1791702923"></script>
-<script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
-<script src="scene_logic.js?v=1791702923"></script>
-<script src="scene3d.js?v=1791702923"></script>
-<script src="views3d.js?v=1791702923"></script>
+<script src="layout.js?v=1791805216"></script>
+<script src="samples.js?v=1791805216"></script>
+<script src="editor.js?v=1791805216"></script>
+<script src="board.js?v=1791805216"></script>
+<script src="vendor/three.min.js?v=1791805216" onerror="var s=document.createElement('script');s.src='https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js';document.head.appendChild(s)"></script>
+<script src="scene_logic.js?v=1791805216"></script>
+<script src="scene3d.js?v=1791805216"></script>
+<script src="views3d.js?v=1791805216"></script>
 <script src="samples.local.js" onerror="this.remove()"></script>
 <script>
 // 방문·이용 측정(기본 꺼짐). 쿠키 없이 세는 서비스(예: GoatCounter)의 주소를 넣으면 켜집니다.
 // 예) const ANALYTICS_URL = "https://내코드.goatcounter.com/count";  (상업적 이용은 유료 플랜 확인 필요)
 const ANALYTICS_URL = "";
 if (ANALYTICS_URL) { const sc = document.createElement("script"); sc.async = true; sc.dataset.goatcounter = ANALYTICS_URL; sc.src = "//gc.zgo.at/count.js"; document.head.appendChild(sc); }
+window.addEventListener("error", (e) => { try { if (e && e.message && !/ResizeObserver/.test(e.message)) { const b = document.getElementById("errBanner"); if (b) b.hidden = false; } } catch (x) {} });
 const track = (name) => { try { window.goatcounter && window.goatcounter.count && window.goatcounter.count({ path: "event/" + name, title: name, event: true }); } catch (e) {} };
 
 const E = window.LayoutEngine;
@@ -319,7 +322,7 @@ function renderFurn() {
 let LV = null;
 function renderLock() {
   const r = room();
-  if (Views3D.ok()) { // 3D로 보여주고, 가구를 누르면 이동 불가(🔒) 표시
+  if (Views3D.ok() && ($("#adv").open || LV)) { // 3D로 보여주고, 가구를 누르면 이동 불가(🔒) 표시. 항목을 열기 전에는 만들지 않는다
     try {
       const b = Views3D.before(r, engineOpts(), itemNames());
       if (!LV) LV = Scene3D.lockView($("#lockPlan"), (id) => { st.locked.has(id) ? st.locked.delete(id) : st.locked.add(id); renderLock(); renderAdvSummary(); $("#out").innerHTML = ""; $("#quote").hidden = true; });
@@ -449,7 +452,7 @@ $("#customBudget").addEventListener("input", (e) => { st.budget = Math.round(Num
   const W = Number($("#w").value), D = Number($("#d").value);
   st.custom = W >= 200 && D >= 200 ? { W, D } : null; if (st.custom) st.chosen.size = true; if (!st.touched) resetSizes(); renderSizes(); renderBasicsSummary(); renderFurn(); renderLock(); updateBar(); }));
 $("#clearCustom").addEventListener("click", () => { st.custom = null; $("#w").value = ""; $("#d").value = ""; if (!st.touched) resetSizes(); renderSizes(); renderBasicsSummary(); renderFurn(); renderLock(); updateBar(); });
-$("#adv").addEventListener("toggle", () => { if (LV) setTimeout(() => LV.resize(), 50); });
+$("#adv").addEventListener("toggle", () => { if ($("#adv").open) { renderLock(); if (LV) setTimeout(() => LV.resize(), 50); } });
 $("#rental").addEventListener("change", (e) => { st.rental = e.target.checked; });
 function compress(file) {
   return new Promise((res) => { const img = new Image(), url = URL.createObjectURL(file);
