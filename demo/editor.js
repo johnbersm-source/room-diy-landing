@@ -104,12 +104,32 @@
     const g = []; steps.forEach((s) => { const l = g[g.length - 1]; if (l && l.need === s.need) l.names.push(s.it.name); else g.push({ need: s.need, names: [s.it.name] }); });
     return g;
   }
-  function more(purchase, budget, attr) {
-    if (!purchase.over.length) return "";
-    const g = ladder(purchase, budget);
-    return `<div class="sug"><b>예산을 올리면 이런 것도 더할 수 있어요</b>
-      ${g.map((x) => `<div style="display:flex;justify-content:space-between;gap:8px;align-items:center;padding:4px 0"><span>${x.names.map(esc).join(" · ")}</span><button type="button" class="cta2" style="width:auto;display:inline-block;margin:0;padding:8px 14px;font-size:13px;border:0;cursor:pointer;flex:none;white-space:nowrap" ${attr}="${x.need}">${x.need / 10000}만원으로</button></div>`).join("")}
-      <p class="mut">필요 예산은 각 품목의 중간 예상가를 더한 값이에요. 꼭 늘릴 필요는 없어요.</p></div>`;
+  // 가격 표기: 3만원, 2.8만원 / 1,500원
+  const plus = (n) => { const v = Math.round(n / 1000) * 1000; return "+" + (v >= 10000 ? (v % 10000 === 0 ? v / 10000 : (v / 10000).toFixed(1)) + "만원" : v.toLocaleString("ko-KR") + "원"); };
+  const LIGHT = ["lamp", "moodLamp", "lightSet", "deskLamp"], TEXT = ["curtain", "cushion", "bedding", "rugSmall", "rug"];
+  // 남은 품목으로 만드는 추천 조합 최대 3가지(가성비 / 분위기 / 한 번에)
+  function combos(over) {
+    const by = [...over].sort((a, b) => a.mid - b.mid), out = [], seen = new Set();
+    const add = (title, items) => { items = items.filter(Boolean); const key = items.map((i) => i.key).sort().join(","); if (!items.length || seen.has(key)) return; seen.add(key); out.push({ title, items, total: items.reduce((t, i) => t + i.mid, 0) }); };
+    add("가성비 조합", by.slice(0, 2));
+    const light = by.find((i) => LIGHT.includes(i.key)), tx = by.filter((i) => TEXT.includes(i.key)).slice(0, 2);
+    add("분위기 조합 (조명+패브릭)", [light, ...tx]);
+    add("한 번에 꾸미기", over.slice(0, 4));
+    return out;
+  }
+  // mode: "res"(결과 화면) | "quote"(견적서). forced: 사용자가 직접 추가한 품목 키
+  function more(purchase, budget, mode, forced) {
+    forced = forced || []; const A = mode === "quote" ? { add: "data-qaddx", del: "data-qdelx", combo: "data-qcombo" } : { add: "data-addx", del: "data-delx", combo: "data-combo" };
+    const added = purchase.inBudget.filter((i) => forced.includes(i.key)), over = purchase.over;
+    if (!over.length && !added.length) return "";
+    const thumb = (k) => `<img src="items/${esc(k)}.jpg" alt="" width="40" height="40" style="width:40px;height:40px;object-fit:cover;border-radius:8px;background:#fff;flex:none" onerror="this.style.display='none'">`;
+    const cs = combos(over);
+    return `<div class="sug"><b>예산을 더하면 이렇게 꾸밀 수 있어요</b>
+      ${added.length ? `<div class="mut" style="margin:4px 0">고른 것: ${added.map((i) => `<button type="button" class="fb" ${A.del}="${esc(i.key)}" style="padding:4px 8px">${esc(i.name)} ${plus(i.mid)} ✕</button>`).join(" ")}</div>` : ""}
+      ${cs.length ? `<div style="margin:6px 0"><b style="font-size:14px">${added.length ? esc(added.map((i) => i.name).join("·")) + " 포함, 이어서 추천" : "추천 조합 3가지"}</b>
+        ${cs.map((c) => `<button type="button" class="card" ${A.combo}="${c.items.map((i) => esc(i.key)).join(",")}" style="display:block;width:100%;text-align:left;margin:6px 0;padding:10px;background:var(--bg);border:1px solid var(--line)"><b>${esc(c.title)}</b> <span style="float:right;color:var(--acc);font-weight:700">${plus(c.total)}</span><br><small class="mut">${c.items.map((i) => `${esc(i.name)} ${plus(i.mid)}`).join(" · ")}</small></button>`).join("")}</div>` : ""}
+      ${over.length ? `<div style="margin-top:6px"><b style="font-size:14px">하나씩 더하기</b>${over.map((i) => `<button type="button" class="card" ${A.add}="${esc(i.key)}" style="display:flex;width:100%;gap:10px;align-items:center;text-align:left;margin:6px 0;padding:8px;background:var(--bg);border:1px solid var(--line)">${thumb(i.key)}<span style="flex:1"><b>${esc(i.name)}</b><br><small class="mut">최저 ${i.price[0].toLocaleString("ko-KR")}원부터 · ${esc(i.size)}</small></span><b style="color:var(--acc)">${plus(i.mid)}</b></button>`).join("")}</div>` : ""}
+      <p class="mut">+금액은 그 제품 하나를 더하는 값(중간 예상가)이에요. 누르면 방에 알맞은 자리에 놓아 보여줘요. 꼭 늘릴 필요는 없어요.</p></div>`;
   }
 
   /* ---------- 끌어서 배치 편집기 ---------- */
@@ -193,7 +213,7 @@
     };
   }
 
-  const api = { icon, ICON, TREND, showItem, preview, row, more, ladder, open, checks };
+  const api = { icon, ICON, TREND, showItem, preview, row, more, ladder, combos, plus, open, checks };
   if (typeof window !== "undefined") window.Editor = api;
   if (typeof module !== "undefined") module.exports = api;
 })();

@@ -596,17 +596,21 @@
   }
 
   // 예산 안에서 품목을 앞에서부터 담는다 (가격은 가정 범위의 중간값)
-  function planPurchase(keys, budget) {
+  function planPurchase(keys, budget, forced) {
+    forced = forced || new Set();
     let items = keys.map(mkItem);
     // 예산이 10만원 이하면 가성비 순(싼 것부터)으로 담아 더 많은 품목을 준비할 수 있게 한다
     if (budget != null && budget <= 100000) items = items.map((it, i) => [it, i]).sort((a, b) => (a[0].price[0] + a[0].price[1]) - (b[0].price[0] + b[0].price[1]) || a[1] - b[1]).map((x) => x[0]);
     let spent = 0; const inBudget = [], over = [];
+    // 사용자가 직접 고른(추가한) 품목은 예산과 상관없이 먼저 담는다
+    items.filter((it) => forced.has(it.key)).forEach((it) => { const mid = Math.round((it.price[0] + it.price[1]) / 2); spent += mid; inBudget.push(Object.assign({ mid, forced: true }, it)); });
+    items = items.filter((it) => !forced.has(it.key));
     items.forEach((it) => {
       const mid = Math.round((it.price[0] + it.price[1]) / 2);
       if (budget == null || spent + mid <= budget) { spent += mid; inBudget.push(Object.assign({ mid }, it)); }
       else over.push(Object.assign({ mid }, it));
     });
-    return { inBudget, over, total: spent, max: items.reduce((t, it) => t + Math.round((it.price[0] + it.price[1]) / 2), 0) };
+    return { inBudget, over, total: spent, max: inBudget.concat(over).reduce((t, it) => t + Math.round((it.price[0] + it.price[1]) / 2), 0) };
   }
 
   function normalize(opts) {
@@ -673,7 +677,9 @@
         }
       });
       c.score = c.blocked ? 0 : score(c.checks);
-      c.purchase = planPurchase(c.items, opts.budget);
+      const fk = c.items.length ? (opts.forced || []).filter((k) => ITEM[k] && !(ban.includes(k))) : [];
+      fk.forEach((k) => { if (!c.items.includes(k)) c.items.push(k); });
+      c.purchase = planPurchase(c.items, opts.budget, new Set(fk));
       // 이 방에서 놓을 자리를 확인했는지(구매 전 불안 줄이기)
       const pm = { rug: "rug", rugSmall: "rug", lamp: "lamp", chair: "chair", nightstand: "ns", bookcase: "bookcase", desk: "desk" };
       c.purchase.inBudget.forEach((it) => {

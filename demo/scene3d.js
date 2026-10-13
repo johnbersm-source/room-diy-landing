@@ -111,21 +111,26 @@
     g.addColorStop(0, "#bfe0ff"); g.addColorStop(0.55, "#eaf5ff"); g.addColorStop(0.75, "#cfe2c4"); g.addColorStop(1, "#a9c79b"); x.fillStyle = g; x.fillRect(0, 0, 64, 128);
     const t = new T.CanvasTexture(c); t.encoding = T.sRGBEncoding; return t;
   }
-  function buildRoom(U, windows, door) {
+  function buildRoom(U, windows, door, doll) {
     const g = new T.Group(); _plank = _plank || plankTexture();
     const fl = _plank.clone(); fl.needsUpdate = true; fl.repeat.set(U.W / 150, U.D / 150);
     const floor = new T.Mesh(new T.PlaneGeometry(U.W, U.D), new T.MeshStandardMaterial({ map: fl, roughness: 0.55, metalness: 0 })); floor.rotation.x = -Math.PI / 2; floor.position.set(U.W / 2, 0, U.D / 2); floor.receiveShadow = true; g.add(floor);
     const wallMat = M(0xf1ece3, 0.95), TH = 6;
     const wall = (w, h, d, x, y, z, layer) => { const m = new T.Mesh(new T.BoxGeometry(w, h, d), wallMat); m.position.set(x, y, z); m.receiveShadow = true; if (layer != null) m.layers.set(layer); g.add(m); return m; };
-    wall(U.W + TH * 2, WALL_H, TH, U.W / 2, WALL_H / 2, -TH / 2);
-    wall(TH, WALL_H, U.D, -TH / 2, WALL_H / 2, U.D / 2);
-    wall(TH, WALL_H, U.D, U.W + TH / 2, WALL_H / 2, U.D / 2);
-    wall(U.W + TH * 2, WALL_H, TH, U.W / 2, WALL_H / 2, U.D + TH / 2, 1); // 위에서 볼 때만
+    if (doll) { // 돌려보기용: 안쪽을 향한 벽 4개(바깥에서 보면 가까운 벽은 사라져 방 안이 보인다)
+      const pw = (w, x, z, ry) => { const m = new T.Mesh(new T.PlaneGeometry(w, WALL_H), wallMat); m.position.set(x, WALL_H / 2, z); m.rotation.y = ry; m.receiveShadow = true; g.add(m); };
+      pw(U.W, U.W / 2, 0, 0); pw(U.D, 0, U.D / 2, Math.PI / 2); pw(U.D, U.W, U.D / 2, -Math.PI / 2); pw(U.W, U.W / 2, U.D, Math.PI);
+    } else {
+      wall(U.W + TH * 2, WALL_H, TH, U.W / 2, WALL_H / 2, -TH / 2);
+      wall(TH, WALL_H, U.D, -TH / 2, WALL_H / 2, U.D / 2);
+      wall(TH, WALL_H, U.D, U.W + TH / 2, WALL_H / 2, U.D / 2);
+      wall(U.W + TH * 2, WALL_H, TH, U.W / 2, WALL_H / 2, U.D + TH / 2, 1); // 위에서 볼 때만
+    }
     // 걸레받이
     const bb = M(0xffffff, 0.7), base = (w, d, x, z) => { const m = new T.Mesh(new T.BoxGeometry(w, 8, d), bb); m.position.set(x, 4, z); m.receiveShadow = true; g.add(m); };
     base(U.W, 1.6, U.W / 2, 0.8); base(1.6, U.D, 0.8, U.D / 2); base(1.6, U.D, U.W - 0.8, U.D / 2);
     // 천장(정면에서 볼 때만)
-    const ceil = new T.Mesh(new T.PlaneGeometry(U.W, U.D), M(0xffffff, 1)); ceil.rotation.x = Math.PI / 2; ceil.position.set(U.W / 2, WALL_H, U.D / 2); ceil.layers.set(2); g.add(ceil);
+    if (!doll) { const ceil = new T.Mesh(new T.PlaneGeometry(U.W, U.D), M(0xffffff, 1)); ceil.rotation.x = Math.PI / 2; ceil.position.set(U.W / 2, WALL_H, U.D / 2); ceil.layers.set(2); g.add(ceil); }
     (windows || []).forEach((w) => {
       const ww = Math.min(w.w, (w.wall === "far" ? U.W : U.D) - 30), p = L.wallPlace(w.wall, 0.5, U, ww, 4);
       const wg = new T.Group(); B(wg, ww + 10, 154, 3, 0xffffff, 0, 0, 0, 0.6);
@@ -153,18 +158,18 @@
     if (w / h < aspect) w = h * aspect; else h = w / aspect;
     const cam = new T.OrthographicCamera(-w, w, h, -h, 10, 3000); cam.position.set(U.W / 2, 1000, U.D / 2); cam.up.set(0, 0, -1); cam.lookAt(U.W / 2, 0, U.D / 2); cam.layers.enable(1); return cam;
   }
-  function newScene(U, windows, door, bg) {
+  function newScene(U, windows, door, bg, doll) {
     const sc = new T.Scene(); sc.background = lin(bg);
-    sc.add(new T.HemisphereLight(0xfff6ea, 0xb5a591, 0.5));
+    sc.add(new T.HemisphereLight(0xfff6ea, 0xb5a591, 0.62));
     // 창 쪽에서 들어오는 부드러운 햇빛(그림자가 생긴다). 창이 없으면 위에서
     const win = (windows || [])[0], cx = U.W / 2, cz = U.D / 2, dl = new T.DirectionalLight(0xfff1dc, 0.95);
     const from = win ? (win.wall === "far" ? [cx + U.W * 0.15, 330, -260] : win.wall === "left" ? [-260, 330, cz - U.D * 0.15] : [U.W + 260, 330, cz - U.D * 0.15]) : [cx, 520, cz + 60];
     dl.position.set(from[0], from[1], from[2]); dl.target.position.set(cx, 0, cz); sc.add(dl); sc.add(dl.target);
     dl.castShadow = true; dl.shadow.mapSize.set(1024, 1024); const R = Math.max(U.W, U.D) * 0.85; Object.assign(dl.shadow.camera, { left: -R, right: R, top: R, bottom: -R, near: 50, far: 1400 }); dl.shadow.bias = -0.0006; dl.shadow.radius = 4; dl.shadow.camera.updateProjectionMatrix();
-    sc.add(buildRoom(U, windows, door)); return sc;
+    sc.add(buildRoom(U, windows, door, doll)); return sc;
   }
   // 모든 화면 공통: 부드러운 그림자·색 보정
-  function prep(r) { r.shadowMap.enabled = true; r.shadowMap.type = T.PCFSoftShadowMap; r.outputEncoding = T.sRGBEncoding; r.toneMapping = T.ACESFilmicToneMapping; r.toneMappingExposure = 0.92; return r; }
+  function prep(r) { r.shadowMap.enabled = true; r.shadowMap.type = T.PCFSoftShadowMap; r.outputEncoding = T.sRGBEncoding; r.toneMapping = T.ACESFilmicToneMapping; r.toneMappingExposure = 1.0; return r; }
 
   /* ---------- 객체 그룹 ---------- */
   function placeGroup(g, o) {
@@ -207,6 +212,14 @@
     if (clean) hideAI(sc, true); r.render(sc, cam); const url = r.domElement.toDataURL("image/jpeg", 0.88); disposeScene(sc); return url;
   }
 
+  // 방 한가운데에서 yaw(라디안) 방향을 바라본 모습(둘러보기 사진 만들기용). clean이면 안내 표시를 숨긴다.
+  function lookSnapshot(room, objs, yaw, w, h, clean) {
+    w = w || 640; h = h || 480; const r = sharedRenderer(w, h), U = room.U, sc = newScene(U, room.windows, room.door, FRONT_BG);
+    fillScene(sc, objs.map((o) => Object.assign({}, o)));
+    const cam = new T.PerspectiveCamera(78, w / h, 5, 3000); cam.position.set(U.W / 2, 135, U.D / 2); cam.lookAt(U.W / 2 + Math.sin(yaw) * 300, 120, U.D / 2 - Math.cos(yaw) * 300); cam.layers.enable(1); cam.layers.enable(2);
+    if (clean) hideAI(sc, true); r.render(sc, cam); const url = r.domElement.toDataURL("image/jpeg", 0.9); disposeScene(sc); return url;
+  }
+
   /* ---------- 편집 화면 ---------- */
   const esc = (v) => String(v).replace(/[&<>"']/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" }[c]));
   function modal() {
@@ -229,9 +242,9 @@
       <div class="row seg" style="margin-top:6px"><button type="button" data-s3="rotl">↺ 왼쪽으로</button><button type="button" data-s3="rotr">↻ 오른쪽으로</button><button type="button" data-s3="small">− 작게</button><button type="button" data-s3="big">+ 크게</button><button type="button" data-s3="del" id="s3Del">✕ 지우기</button></div>
       <div class="mut" id="s3Sel" style="margin-top:4px">물체를 눌러 선택하세요</div>
       <ul class="chk" id="s3Chk"></ul>
-      <div class="mut" style="margin-top:6px">놓은 제품 <span style="font-size:12px">(✕를 누르면 지워요)</span></div><div class="row seg" id="s3Placed"></div>
-      <div class="mut" style="margin-top:6px">더하기</div><div class="row seg" id="s3Add"></div>
-      <div id="s3Out"></div>
+      <div class="mut" style="margin-top:6px">놓은 제품 <span style="font-size:12px">(✕를 누르면 지워요)</span></div><div class="s3tray" id="s3Placed"></div>
+      <div class="mut" style="margin-top:6px">더하기 <span style="font-size:12px">(누르면 방에 알맞은 자리에 놓여요)</span></div><div class="s3tray" id="s3Add"></div>
+      <style>.s3tray{display:flex;gap:8px;overflow-x:auto;padding:4px 2px 8px}.s3card{flex:none;width:84px;border:1px solid var(--line);background:var(--card);border-radius:12px;padding:5px;text-align:center;font:inherit;font-size:12px;color:inherit;cursor:pointer;position:relative}.s3card[aria-pressed=true]{border-color:var(--fg)}.s3card span{display:block;margin-top:3px;line-height:1.2}.s3card b{display:block;color:var(--acc);font-size:12px}.s3card i{position:absolute;right:3px;top:3px;background:rgba(0,0,0,.6);color:#fff;border-radius:50%;width:18px;height:18px;line-height:18px;font-style:normal;font-size:11px}</style><div id="s3Out"></div>
       <p class="mut">3D 모양은 제품을 단순하게 그린 예시예요. 실제 제품의 모양·색·크기와 달라요.</p>
       <div class="row"><button class="cta" type="button" data-s3="save">이 배치 저장하기</button>${opts.compose ? '<button class="cta ghost" type="button" data-s3="aif">AI 실사로 보기(정면)</button><button class="cta ghost" type="button" data-s3="ait">AI 실사로 보기(위에서)</button>' : ""}<button class="cta ghost" type="button" data-s3="close">닫기</button></div></div>`;
     m.style.display = "flex";
@@ -250,12 +263,14 @@
     function buildSel() {
       while (selGroup.children.length) selGroup.remove(selGroup.children[0]);
       const o = objs.find((x) => x.id === sel); if (!o || o.mount === "on") return;
-      const rad = Math.max(o.w, o.d) / 2 + 12, ring = new T.Mesh(new T.RingGeometry(rad, rad + 3, 40), new T.MeshBasicMaterial({ color: 0x2f7352, side: T.DoubleSide, depthTest: false }));
-      ring.rotation.x = -Math.PI / 2; ring.position.set(o.cx, 1.5, o.cz); ring.renderOrder = 5; selGroup.add(ring);
+      // 선택 표시: 바닥의 둥근 띠 대신 물체를 감싸는 얇은 선 + 방향을 돌리는 작은 손잡이
+      const hh = (o.h || 50) + 3, outline = new T.LineSegments(new T.EdgesGeometry(new T.BoxGeometry(o.w + 3, hh, o.d + 3)), new T.LineBasicMaterial({ color: 0x1f2933, transparent: true, opacity: 0.85 }));
+      outline.position.set(o.cx, (o.elev || 0) + hh / 2, o.cz); outline.rotation.y = o.rot; selGroup.add(outline);
       if (o.mount === "floor") {
-        const f = { x: Math.sin(o.rot), z: Math.cos(o.rot) }, kr = rad + 16, knob = new T.Mesh(new T.SphereGeometry(8, 14, 10), new T.MeshBasicMaterial({ color: 0x2f7352, depthTest: false }));
-        knob.position.set(o.cx + f.x * kr, 8, o.cz + f.z * kr); knob.userData.knob = true; knob.renderOrder = 6; selGroup.add(knob);
-        const ln = new T.Mesh(new T.BoxGeometry(2, 1, kr - rad), new T.MeshBasicMaterial({ color: 0x2f7352, depthTest: false })); ln.position.set(o.cx + f.x * (rad + kr) / 2, 2, o.cz + f.z * (rad + kr) / 2); ln.rotation.y = o.rot; ln.renderOrder = 5; selGroup.add(ln);
+        const rad = Math.max(o.w, o.d) / 2, f = { x: Math.sin(o.rot), z: Math.cos(o.rot) }, kr = rad + 18;
+        const knob = new T.Mesh(new T.SphereGeometry(7, 16, 12), new T.MeshBasicMaterial({ color: 0xffffff, depthTest: false })); knob.position.set(o.cx + f.x * kr, 8, o.cz + f.z * kr); knob.userData.knob = true; knob.renderOrder = 6; selGroup.add(knob);
+        const rim = new T.Mesh(new T.RingGeometry(7, 9, 20), new T.MeshBasicMaterial({ color: 0x1f2933, side: T.DoubleSide, depthTest: false })); rim.position.copy(knob.position); rim.rotation.x = -Math.PI / 2; rim.renderOrder = 6; selGroup.add(rim);
+        const ln = new T.Mesh(new T.BoxGeometry(1.4, 1, kr - rad), new T.MeshBasicMaterial({ color: 0x1f2933, depthTest: false })); ln.position.set(o.cx + f.x * (rad + kr) / 2, 2, o.cz + f.z * (rad + kr) / 2); ln.rotation.y = o.rot; ln.renderOrder = 5; selGroup.add(ln);
       }
     }
     function refreshUi() {
@@ -263,9 +278,12 @@
       m.querySelector("#s3Sel").textContent = o ? `선택: ${o.label} · 방향 ${Math.round((o.rot * 180 / Math.PI + 360) % 360)}° · 크기 ${Math.round((o.s || 1) * 100)}%` : "물체를 눌러 선택하세요";
       const delBtn = m.querySelector("#s3Del"); delBtn.disabled = !o || o.base;
       m.querySelector("#s3Chk").innerHTML = (() => { const ck = L.checksOf(objs, U, opts.room.door); return (ck.length ? ck : [{ level: "ok", msg: "겹침·문 열림 공간 문제 없음(간단 점검)" }]).map((k) => `<li class="${k.level}">${esc(k.msg)}</li>`).join(""); })();
-      m.querySelector("#s3Placed").innerHTML = objs.filter((x) => !x.base && x.key).map((x) => `<button type="button" data-rm="${esc(x.id)}" aria-pressed="${x.id === sel}">${esc(x.label)} ✕</button>`).join("") || '<span class="mut">추가한 제품이 없어요</span>';
+      const plus = (n) => { const v = Math.round(n / 1000) * 1000; return "+" + (v >= 10000 ? (v % 10000 === 0 ? v / 10000 : (v / 10000).toFixed(1)) + "만원" : v.toLocaleString("ko-KR") + "원"); };
+      const th = (k) => `<img src="items/${esc(k)}.jpg" alt="" style="width:100%;aspect-ratio:1;object-fit:cover;border-radius:8px;background:#fff;display:block" onerror="this.style.display='none'">`;
+      const mid = (k) => { const p = (names[k] || {}).price; return p ? Math.round((p[0] + p[1]) / 2) : 0; };
+      m.querySelector("#s3Placed").innerHTML = objs.filter((x) => !x.base && x.key && x.mount !== undefined).map((x) => `<button type="button" class="s3card" data-rm="${esc(x.id)}" aria-pressed="${x.id === sel}">${th(x.key)}<span>${esc(x.label)}</span><i>✕</i></button>`).join("") || '<span class="mut">추가한 제품이 없어요</span>';
       const have = new Set(objs.map((x) => x.key).filter(Boolean));
-      m.querySelector("#s3Add").innerHTML = (opts.addable || []).filter((k) => !have.has(k)).map((k) => `<button type="button" data-add="${esc(k)}">+ ${esc((names[k] || {}).name || k)}</button>`).join("") || '<span class="mut">모두 놓았어요</span>';
+      m.querySelector("#s3Add").innerHTML = (opts.addable || []).filter((k) => !have.has(k)).map((k) => `<button type="button" class="s3card" data-add="${esc(k)}">${th(k)}<span>${esc((names[k] || {}).name || k)}</span><b>${mid(k) ? plus(mid(k)) : ""}</b></button>`).join("") || '<span class="mut">모두 놓았어요</span>';
     }
     // 입력 처리 -------------------------------------------------
     const ray = new T.Raycaster(), ndc = new T.Vector2(), plane = new T.Plane(new T.Vector3(0, 1, 0), 0);
@@ -335,6 +353,45 @@
     (function loop() { if (!alive) return; if (dirty) { dirty = false; views.forEach((v) => v.r.render(sc, v.cam)); } requestAnimationFrame(loop); })();
   }
 
+
+  /* ---------- 돌려보기: 끌어서 방을 한 바퀴 돌려보고(마우스·한 손가락), 확대·축소(휠·두 손가락), Before/After 전환 ---------- */
+  function orbitView(opts) {
+    const m = modal(), U = opts.room.U; let which = opts.start || "after", yaw = -0.6, pitch = 0.62, dist = Math.max(U.W, U.D) * 1.9, auto = true, alive = true, dirty = true;
+    m.innerHTML = `<div style="background:var(--bg);color:var(--fg);width:100%;max-width:680px;max-height:96vh;overflow:auto;border-radius:16px 16px 0 0;padding:12px;user-select:none;-webkit-user-select:none">
+      <h3 style="margin:0 0 6px">${esc(opts.title || "3D로 돌려보기")}</h3>
+      <div class="segs c2" id="obTog" style="margin-bottom:8px"><button type="button" data-ob="before" aria-pressed="${which === "before"}">Before (지금)</button><button type="button" data-ob="after" aria-pressed="${which === "after"}">After (추천)</button></div>
+      <div id="obWrap" style="width:100%;aspect-ratio:4/3;border-radius:12px;overflow:hidden;touch-action:none;background:#e9e5dd"></div>
+      <p class="mut" style="margin:6px 0">끌어서 돌려보고, 휠·두 손가락으로 크게·작게 볼 수 있어요. 모양은 단순하게 그린 예시예요.</p>
+      <div class="row"><button class="cta ghost" type="button" data-ob="close">닫기</button></div></div>`;
+    m.style.display = "flex";
+    const wrap = m.querySelector("#obWrap"), r = prep(new T.WebGLRenderer({ antialias: true })), sc = newScene(U, opts.room.windows, opts.room.door, FRONT_BG, true);
+    wrap.appendChild(r.domElement); r.domElement.style.cssText = "width:100%;height:100%;display:block;touch-action:none";
+    const cam = new T.PerspectiveCamera(50, 4 / 3, 5, 5000), tgt = new T.Vector3(U.W / 2, 70, U.D / 2);
+    function place() { const cp = Math.cos(pitch); cam.position.set(tgt.x + Math.sin(yaw) * cp * dist, tgt.y + Math.sin(pitch) * dist, tgt.z + Math.cos(yaw) * cp * dist); cam.lookAt(tgt); }
+    function size() { const w = wrap.clientWidth || 320, h = wrap.clientHeight || 240; r.setPixelRatio(Math.min(2, root.devicePixelRatio || 1)); r.setSize(w, h, false); cam.aspect = w / h; cam.updateProjectionMatrix(); dirty = true; }
+    function load() { fillScene(sc, (which === "before" ? opts.before : opts.after).map((o) => Object.assign({}, o))); dirty = true; }
+    size(); load(); place();
+    const ro = typeof ResizeObserver !== "undefined" ? new ResizeObserver(size) : null; if (ro) ro.observe(wrap);
+    const ptr = new Map(); let pd = 0;
+    r.domElement.addEventListener("pointerdown", (e) => { e.preventDefault(); auto = false; ptr.set(e.pointerId, { x: e.clientX, y: e.clientY }); try { r.domElement.setPointerCapture(e.pointerId); } catch (x) {} if (ptr.size === 2) { const [a, b] = [...ptr.values()]; pd = Math.hypot(a.x - b.x, a.y - b.y); } });
+    r.domElement.addEventListener("pointermove", (e) => {
+      const p = ptr.get(e.pointerId); if (!p) return; e.preventDefault();
+      if (ptr.size === 1) { yaw -= (e.clientX - p.x) * 0.008; pitch = Math.min(1.35, Math.max(0.08, pitch + (e.clientY - p.y) * 0.006)); }
+      ptr.set(e.pointerId, { x: e.clientX, y: e.clientY });
+      if (ptr.size === 2) { const [a, b] = [...ptr.values()], d2 = Math.hypot(a.x - b.x, a.y - b.y); if (pd) dist = Math.min(Math.max(U.W, U.D) * 2.6, Math.max(120, dist * pd / d2)); pd = d2; }
+      place(); dirty = true;
+    });
+    const up = (e) => { ptr.delete(e.pointerId); pd = 0; }; r.domElement.addEventListener("pointerup", up); r.domElement.addEventListener("pointercancel", up);
+    r.domElement.addEventListener("wheel", (e) => { e.preventDefault(); auto = false; dist = Math.min(Math.max(U.W, U.D) * 2.6, Math.max(120, dist * (e.deltaY > 0 ? 1.08 : 0.92))); place(); dirty = true; }, { passive: false });
+    function close() { alive = false; if (ro) ro.disconnect(); r.dispose(); disposeScene(sc); m.style.display = "none"; m.onclick = null; m.innerHTML = ""; }
+    m.onclick = (e) => {
+      if (e.target === m) { close(); return; } const b = e.target.closest("[data-ob]"); if (!b) return; const k = b.dataset.ob;
+      if (k === "close") close(); else { which = k; m.querySelectorAll("#obTog button").forEach((x) => x.setAttribute("aria-pressed", x.dataset.ob === k)); load(); }
+    };
+    root.__orb = { r, sc, cam, set: (y, p, d) => { yaw = y; pitch = p; if (d) dist = d; auto = false; place(); } };
+    (function loop() { if (!alive) return; if (auto) { yaw += 0.004; place(); dirty = true; } if (dirty) { dirty = false; r.render(sc, cam); } requestAnimationFrame(loop); })();
+  }
+
   /* ---------- 이동 불가 가구 고르기용 3D 보기(정면 + 위에서). 가구를 누르면 onToggle(id) ---------- */
   function lockView(el, onToggle) {
     el.innerHTML = `<div class="mut" style="font-size:12px">문에서 본 모습 (가구를 눌러 고르세요)</div><div class="lvf" style="width:100%;aspect-ratio:4/3;border-radius:10px;overflow:hidden"></div>
@@ -370,5 +427,5 @@
     return { update, resize: size };
   }
 
-  root.Scene3D = { snapshot, openEditor, buildModel, frontCamera, topCamera, lockView };
+  root.Scene3D = { snapshot, lookSnapshot, openEditor, orbitView, buildModel, frontCamera, topCamera, lockView };
 })(typeof window !== "undefined" ? window : globalThis);
