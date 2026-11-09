@@ -229,24 +229,31 @@
   }
 
   /* opts: { room:{U,windows,door}, objs, names:{key:{name}}, label(id)->이름, onSave(objs), compose(dataUrl, view)->Promise<dataUrl>, addable:[키...] } */
+  const VERSIONS = {}; // 방 크기별 저장 배치(페이지가 열려 있는 동안 유지). ponytail: 새로고침하면 사라짐, 필요하면 localStorage
   function openEditor(opts) {
     const m = modal(), U = opts.room.U, objs = opts.objs.map((o) => Object.assign({}, o));
     const names = opts.names || {}, nameOf = (o) => o.key ? ((names[o.key] || {}).name || o.key) : ({ bed: "침대", wardrobe: "옷장", sofa: "소파", tvconsole: "TV장", coffeetable: "커피테이블", desk: "책상", nightstand: "협탁", pillar: "기둥" }[o.type] || o.type);
     objs.forEach((o) => { o.label = nameOf(o); });
-    let sel = null, dirty = true, drag = null, alive = true;
+    let sel = null, dirty = true, drag = null, alive = true, lastWheel = 0;
+    const hist = L.makeHistory(50), vers = VERSIONS[U.W + "x" + U.D] || (VERSIONS[U.W + "x" + U.D] = L.makeVersions(4));
+    const mid = (k) => { const p = (names[k] || {}).price; return p ? Math.round((p[0] + p[1]) / 2) : 0; };
+    function restore(s) { objs.length = 0; s.forEach((o) => objs.push(o)); if (!objs.some((x) => x.id === sel)) sel = null; rebuild(); }
+    function undoRedo(redo) { const s = redo ? hist.redo(objs) : hist.undo(objs); if (s) restore(s); }
+    const onKey = (e) => { if (!(e.metaKey || e.ctrlKey) || e.key.toLowerCase() !== "z") return; e.preventDefault(); undoRedo(e.shiftKey); };
+    document.addEventListener("keydown", onKey);
     m.innerHTML = `<div style="background:var(--bg);color:var(--fg);width:100%;max-width:680px;max-height:96vh;overflow:auto;border-radius:16px 16px 0 0;padding:12px;user-select:none;-webkit-user-select:none">
       <h3 style="margin:0 0 4px">입체로 꾸며보기</h3>
       <p class="mut" style="margin:0 0 6px">제품을 끌어서 옮겨요. 정면과 위에서 본 모습이 함께 움직여요. 눌러서 선택하면 둥근 손잡이(●)를 돌려 방향을 바꿀 수 있어요(두 손가락으로 비틀기·마우스 휠도 돼요).</p>
       <div class="mut" style="font-size:12px">문에서 본 모습</div><div id="s3Front" style="width:100%;aspect-ratio:4/3;border-radius:10px;overflow:hidden;touch-action:none"></div>
       <div class="mut" style="font-size:12px;margin-top:6px">위에서 본 모습 <span style="color:#b25b00">(주황색 = 문 열림 공간)</span></div><div id="s3Top" style="width:100%;border-radius:10px;overflow:hidden;touch-action:none"></div>
-      <div class="row seg" style="margin-top:6px"><button type="button" data-s3="rotl">↺ 왼쪽으로</button><button type="button" data-s3="rotr">↻ 오른쪽으로</button><button type="button" data-s3="small">− 작게</button><button type="button" data-s3="big">+ 크게</button><button type="button" data-s3="del" id="s3Del">✕ 지우기</button></div>
+      <div class="row seg" style="margin-top:6px"><button type="button" data-s3="rotl">↺ 왼쪽으로</button><button type="button" data-s3="rotr">↻ 오른쪽으로</button><button type="button" data-s3="small">− 작게</button><button type="button" data-s3="big">+ 크게</button><button type="button" data-s3="del" id="s3Del">✕ 지우기</button><button type="button" data-s3="undo" id="s3Undo">↶ 되돌리기</button><button type="button" data-s3="redo" id="s3Redo">↷ 다시</button></div>
       <div class="mut" id="s3Sel" style="margin-top:4px">물체를 눌러 선택하세요</div>
       <ul class="chk" id="s3Chk"></ul>
       <div class="mut" style="margin-top:6px">놓은 제품 <span style="font-size:12px">(✕를 누르면 지워요)</span></div><div class="s3tray" id="s3Placed"></div>
       <div class="mut" style="margin-top:6px">더하기 <span style="font-size:12px">(누르면 방에 알맞은 자리에 놓여요)</span></div><div class="s3tray" id="s3Add"></div>
-      <style>.s3tray{display:flex;gap:8px;overflow-x:auto;padding:4px 2px 8px}.s3card{flex:none;width:84px;border:1px solid var(--line);background:var(--card);border-radius:12px;padding:5px;text-align:center;font:inherit;font-size:12px;color:inherit;cursor:pointer;position:relative}.s3card[aria-pressed=true]{border-color:var(--fg)}.s3card span{display:block;margin-top:3px;line-height:1.2}.s3card b{display:block;color:var(--acc);font-size:12px}.s3card i{position:absolute;right:3px;top:3px;background:rgba(0,0,0,.6);color:#fff;border-radius:50%;width:18px;height:18px;line-height:18px;font-style:normal;font-size:11px}</style><div id="s3Out"></div>
+      <style>.s3tray{display:flex;gap:8px;overflow-x:auto;padding:4px 2px 8px}.s3card{flex:none;width:84px;border:1px solid var(--line);background:var(--card);border-radius:12px;padding:5px;text-align:center;font:inherit;font-size:12px;color:inherit;cursor:pointer;position:relative}.s3card[aria-pressed=true]{border-color:var(--fg)}.s3card span{display:block;margin-top:3px;line-height:1.2}.s3card b{display:block;color:var(--acc);font-size:12px}.s3card i{position:absolute;right:3px;top:3px;background:rgba(0,0,0,.6);color:#fff;border-radius:50%;width:18px;height:18px;line-height:18px;font-style:normal;font-size:11px}</style><div class="mut" style="margin-top:6px">저장한 배치 <span style="font-size:12px">(최대 4개 · 눌러서 불러오기 · 아래 숫자로 비교)</span></div><div class="s3tray" id="s3Vers"></div><div id="s3Out"></div>
       <p class="mut">3D 모양은 제품을 단순하게 그린 예시예요. 실제 제품의 모양·색·크기와 달라요.</p>
-      <div class="row"><button class="cta" type="button" data-s3="save">이 배치 저장하기</button>${opts.compose ? '<button class="cta ghost" type="button" data-s3="aif">AI 실사로 보기(정면)</button><button class="cta ghost" type="button" data-s3="ait">AI 실사로 보기(위에서)</button>' : ""}<button class="cta ghost" type="button" data-s3="close">닫기</button></div></div>`;
+      <div class="row"><button class="cta ghost" type="button" data-s3="ver">＋ 배치 보관(비교용)</button><button class="cta" type="button" data-s3="save">이 배치 저장하기</button>${opts.compose ? '<button class="cta ghost" type="button" data-s3="aif">AI 실사로 보기(정면)</button><button class="cta ghost" type="button" data-s3="ait">AI 실사로 보기(위에서)</button>' : ""}<button class="cta ghost" type="button" data-s3="close">닫기</button></div></div>`;
     m.style.display = "flex";
     const sc = newScene(U, opts.room.windows, opts.room.door, FRONT_BG), scTop = sc; // 같은 장면을 두 시점이 함께 쓴다
     const fw = m.querySelector("#s3Front"), tw = m.querySelector("#s3Top");
@@ -277,11 +284,13 @@
       const o = objs.find((x) => x.id === sel);
       m.querySelector("#s3Sel").textContent = o ? `선택: ${o.label} · 방향 ${Math.round((o.rot * 180 / Math.PI + 360) % 360)}° · 크기 ${Math.round((o.s || 1) * 100)}%` : "물체를 눌러 선택하세요";
       const delBtn = m.querySelector("#s3Del"); delBtn.disabled = !o || o.base;
+      m.querySelector("#s3Undo").disabled = !hist.canUndo(); m.querySelector("#s3Redo").disabled = !hist.canRedo();
       m.querySelector("#s3Chk").innerHTML = (() => { const ck = L.checksOf(objs, U, opts.room.door); return (ck.length ? ck : [{ level: "ok", msg: "겹침·문 열림 공간 문제 없음(간단 점검)" }]).map((k) => `<li class="${k.level}">${esc(k.msg)}</li>`).join(""); })();
       const plus = (n) => { const v = Math.round(n / 1000) * 1000; return "+" + (v >= 10000 ? (v % 10000 === 0 ? v / 10000 : (v / 10000).toFixed(1)) + "만원" : v.toLocaleString("ko-KR") + "원"); };
       const th = (k) => `<img src="items/${esc(k)}.jpg" alt="" style="width:100%;aspect-ratio:1;object-fit:cover;border-radius:8px;background:#fff;display:block" onerror="this.style.display='none'">`;
-      const mid = (k) => { const p = (names[k] || {}).price; return p ? Math.round((p[0] + p[1]) / 2) : 0; };
       m.querySelector("#s3Placed").innerHTML = objs.filter((x) => !x.base && x.key && x.mount !== undefined).map((x) => `<button type="button" class="s3card" data-rm="${esc(x.id)}" aria-pressed="${x.id === sel}">${th(x.key)}<span>${esc(x.label)}</span><i>✕</i></button>`).join("") || '<span class="mut">추가한 제품이 없어요</span>';
+      const man = (n) => (n >= 10000 ? (n / 10000).toFixed(n % 10000 ? 1 : 0) + "만원" : n.toLocaleString("ko-KR") + "원");
+      m.querySelector("#s3Vers").innerHTML = vers.list().map((v, i) => `<button type="button" class="s3card" style="width:132px" data-ver="${i}"><img src="${v.thumb}" alt="" style="width:100%;border-radius:8px;display:block"><span>${esc(v.name)}</span><b>추가 ${man(v.total)}</b><span style="font-size:11px;color:${v.issues ? "#b25b00" : "inherit"}">${v.issues ? "점검 " + v.issues + "건" : "문제 없음"}</span><i data-verx="${i}">✕</i></button>`).join("") || '<span class="mut">보관한 배치가 없어요</span>';
       const have = new Set(objs.map((x) => x.key).filter(Boolean));
       m.querySelector("#s3Add").innerHTML = (opts.addable || []).filter((k) => !have.has(k)).map((k) => `<button type="button" class="s3card" data-add="${esc(k)}">${th(k)}<span>${esc((names[k] || {}).name || k)}</span><b>${mid(k) ? plus(mid(k)) : ""}</b></button>`).join("") || '<span class="mut">모두 놓았어요</span>';
     }
@@ -308,11 +317,11 @@
       const el = v.r.domElement;
       el.addEventListener("pointerdown", (e) => {
         e.preventDefault(); pointers.set(e.pointerId, { x: e.clientX, y: e.clientY, v });
-        if (pointers.size === 2 && sel) { const [a, b] = [...pointers.values()]; drag = { twist: true, ang: Math.atan2(b.y - a.y, b.x - a.x) }; return; }
+        if (pointers.size === 2 && sel) { const [a, b] = [...pointers.values()]; drag = { twist: true, ang: Math.atan2(b.y - a.y, b.x - a.x), before: (drag && drag.before) || JSON.stringify(objs) }; return; }
         const h = pick(v, e); const p = floorPoint(v, e);
-        if (h && h.knob) { drag = { rotate: true, v }; try { el.setPointerCapture(e.pointerId); } catch (er) {} return; }
+        if (h && h.knob) { drag = { rotate: true, v, before: JSON.stringify(objs) }; try { el.setPointerCapture(e.pointerId); } catch (er) {} return; }
         if (h && h.id) { const o = objs.find((x) => x.id === h.id); sel = (o && o.mount === "on") ? o.host : h.id; const so = objs.find((x) => x.id === sel);
-          drag = { v, dx: p ? so.cx - p.x : 0, dz: p ? so.cz - p.z : 0, move: true }; try { el.setPointerCapture(e.pointerId); } catch (er) {} } else { sel = null; drag = null; }
+          drag = { v, dx: p ? so.cx - p.x : 0, dz: p ? so.cz - p.z : 0, move: true, before: JSON.stringify(objs) }; try { el.setPointerCapture(e.pointerId); } catch (er) {} } else { sel = null; drag = null; }
         buildSel(); refreshUi(); dirty = true;
       });
       el.addEventListener("pointermove", (e) => {
@@ -323,18 +332,28 @@
         else if (drag.move) { const p = floorPoint(drag.v, e); if (p) { o.cx = p.x + drag.dx; o.cz = p.z + drag.dz; clampMove(o); } }
         syncAttached(objs); fillScene(sc, objs); buildSel(); refreshUi(); dirty = true;
       });
-      const up = (e) => { pointers.delete(e.pointerId); if (pointers.size < 2 && drag && drag.twist) drag = null; if (!pointers.size) drag = null; };
+      const endDrag = () => { if (drag && drag.before && JSON.stringify(objs) !== drag.before) hist.push(JSON.parse(drag.before)); drag = null; refreshUi(); };
+      const up = (e) => { pointers.delete(e.pointerId); if (pointers.size < 2 && drag && drag.twist) endDrag(); if (!pointers.size) endDrag(); };
       el.addEventListener("pointerup", up); el.addEventListener("pointercancel", up);
-      el.addEventListener("wheel", (e) => { const o = objs.find((x) => x.id === sel); if (!o || o.mount !== "floor") return; e.preventDefault(); o.rot = L.norm(o.rot + (e.deltaY > 0 ? 1 : -1) * Math.PI / 36); syncAttached(objs); fillScene(sc, objs); buildSel(); refreshUi(); dirty = true; }, { passive: false });
+      el.addEventListener("wheel", (e) => { const o = objs.find((x) => x.id === sel); if (!o || o.mount !== "floor") return; e.preventDefault(); if (Date.now() - lastWheel > 600) hist.push(objs); lastWheel = Date.now(); o.rot = L.norm(o.rot + (e.deltaY > 0 ? 1 : -1) * Math.PI / 36); syncAttached(objs); fillScene(sc, objs); buildSel(); refreshUi(); dirty = true; }, { passive: false });
     });
     const resizeObj = (o, k) => { const s2 = Math.min(1.8, Math.max(0.5, (o.s || 1) * k)), f = s2 / (o.s || 1); o.w *= f; o.d *= f; o.h *= f; o.s = s2; };
     const snapshotView = (which) => { const v = which === "top" ? views[1] : views[0]; selGroup.visible = false; hideAI(sc, true); v.r.render(sc, v.cam); const u = v.r.domElement.toDataURL("image/jpeg", 0.88); hideAI(sc, false); selGroup.visible = true; dirty = true; return u; };
-    function close() { alive = false; if (ro) ro.disconnect(); views.forEach((v) => v.r.dispose()); disposeScene(sc); m.style.display = "none"; m.onclick = null; m.innerHTML = ""; }
+    function close() { alive = false; document.removeEventListener("keydown", onKey); if (ro) ro.disconnect(); views.forEach((v) => v.r.dispose()); disposeScene(sc); m.style.display = "none"; m.onclick = null; m.innerHTML = ""; }
     m.onclick = async (e) => {
       if (e.target === m) { close(); return; }
-      const rm = e.target.closest("[data-rm]"); if (rm) { const id = rm.dataset.rm; for (let i = objs.length - 1; i >= 0; i--) if (objs[i].id === id || objs[i].host === id) objs.splice(i, 1); sel = null; rebuild(); return; }
-      const ad = e.target.closest("[data-add]"); if (ad) { const p = L.placeItem(ad.dataset.add, objs, { U, windows: opts.room.windows, door: opts.room.door }); if (p) { p.label = nameOf(p); objs.push(p); sel = p.id; rebuild(); } else alert("놓을 빈 자리가 없어요. 다른 제품을 지우고 시도해보세요."); return; }
+      const vx = e.target.closest("[data-verx]"); if (vx) { vers.remove(+vx.dataset.verx); refreshUi(); return; }
+      const vb = e.target.closest("[data-ver]"); if (vb) { const s = vers.get(+vb.dataset.ver); if (s) { hist.push(objs); restore(s); } return; }
+      const rm = e.target.closest("[data-rm]"); if (rm) { const id = rm.dataset.rm; hist.push(objs); for (let i = objs.length - 1; i >= 0; i--) if (objs[i].id === id || objs[i].host === id) objs.splice(i, 1); sel = null; rebuild(); return; }
+      const ad = e.target.closest("[data-add]"); if (ad) { const p = L.placeItem(ad.dataset.add, objs, { U, windows: opts.room.windows, door: opts.room.door }); if (p) { hist.push(objs); p.label = nameOf(p); objs.push(p); sel = p.id; rebuild(); } else alert("놓을 빈 자리가 없어요. 다른 제품을 지우고 시도해보세요."); return; }
       const b = e.target.closest("[data-s3]"); if (!b) return; const k = b.dataset.s3, o = objs.find((x) => x.id === sel);
+      if ((k === "rotl" || k === "rotr" || k === "big" || k === "small") && o || (k === "del" && o && !o.base)) hist.push(objs);
+      if (k === "ver") {
+        if (vers.list().length >= 4) { alert("보관은 4개까지예요. 하나를 지우고 시도해보세요."); return; }
+        const c = document.createElement("canvas"); c.width = 264; c.height = 198; selGroup.visible = false; hideAI(sc, true); views[0].r.render(sc, views[0].cam); c.getContext("2d").drawImage(views[0].r.domElement, 0, 0, 264, 198); hideAI(sc, false); selGroup.visible = true; dirty = true;
+        vers.add(objs, { name: "배치 " + (vers.list().length + 1), thumb: c.toDataURL("image/jpeg", 0.8), total: objs.reduce((a, x) => a + (x.base ? 0 : mid(x.key)), 0), issues: L.checksOf(objs, U, opts.room.door).length }); refreshUi(); return;
+      }
+      if (k === "undo" || k === "redo") { undoRedo(k === "redo"); return; }
       if (k === "rotl" && o) { o.rot = L.norm(o.rot + Math.PI / 12); rebuild(); }
       else if (k === "rotr" && o) { o.rot = L.norm(o.rot - Math.PI / 12); rebuild(); }
       else if (k === "big" && o) { resizeObj(o, 1.1); clampMove(o); rebuild(); }

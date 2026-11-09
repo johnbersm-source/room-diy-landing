@@ -191,7 +191,29 @@
     return out;
   }
 
-  const api = { PAD, DIMS, TYPE_OF_ITEM, TYPE_OF_PIECE, WALL_MOUNT, HOST_TOP, fromPiece, buildObjects, placeItem, findSpot, aabb, isSolid, doorRect, checksOf, wallPlace, nearestWall, norm, rotOf, hit };
+  // 되돌리기/다시하기: 바뀌기 직전의 장면 객체 목록을 복사해 쌓는다(최대 limit개).
+  function makeHistory(limit) {
+    const past = [], future = [], max = limit || 50, copy = (s) => JSON.parse(JSON.stringify(s));
+    return {
+      push(s) { past.push(copy(s)); if (past.length > max) past.shift(); future.length = 0; },
+      undo(cur) { if (!past.length) return null; future.push(copy(cur)); return past.pop(); },
+      redo(cur) { if (!future.length) return null; past.push(copy(cur)); return future.pop(); },
+      canUndo: () => past.length > 0, canRedo: () => future.length > 0,
+    };
+  }
+
+  // 저장한 배치(버전): 최대 max개, 각자 객체 복사본 + 메타(썸네일 등). 되돌리기와 별개로 나란히 비교·불러오기용.
+  function makeVersions(max) {
+    const list = [], copy = (s) => JSON.parse(JSON.stringify(s));
+    return {
+      add(objs, meta) { if (list.length >= (max || 4)) return false; list.push(Object.assign({}, meta, { objs: copy(objs) })); return true; },
+      get: (i) => (list[i] ? copy(list[i].objs) : null),
+      remove: (i) => { list.splice(i, 1); },
+      list: () => list,
+    };
+  }
+
+  const api = { makeVersions, makeHistory, PAD, DIMS, TYPE_OF_ITEM, TYPE_OF_PIECE, WALL_MOUNT, HOST_TOP, fromPiece, buildObjects, placeItem, findSpot, aabb, isSolid, doorRect, checksOf, wallPlace, nearestWall, norm, rotOf, hit };
   if (typeof module !== "undefined") module.exports = api;
   root.SceneLogic = api;
 })(typeof window !== "undefined" ? window : globalThis);

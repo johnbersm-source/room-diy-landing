@@ -194,7 +194,8 @@ textarea{width:100%;font:12px/1.5 ui-monospace,monospace;background:var(--bg);co
     <input type="file" id="photoCapture" accept="image/*" capture="environment" hidden>
     <img id="preview" alt="" hidden style="max-width:100%;border-radius:10px;margin-top:8px">
     <p class="mut">문 앞에 서서 방 전체가 보이게 찍어주세요. 사진은 이 기기에만 저장돼요. 우편물·택배 송장 같은 주소 정보는 찍히지 않게 해주세요.</p>
-  </div></div>
+  </div>
+  <div id="styleBox" hidden></div></div>
   <div class="grp" id="gBudget"><h3 class="gt">예산 <i class="req">필수</i></h3>
   <div class="segs c3" id="budget"></div>
   <div class="row" id="customBox" hidden>예산 <input id="customBudget" type="number" min="1" max="100000" step="1" value="150"> 만원 <span class="mut" id="customBudgetWon"></span></div></div>
@@ -210,14 +211,15 @@ textarea{width:100%;font:12px/1.5 ui-monospace,monospace;background:var(--bg);co
   <section id="quote" hidden></section>
   <p class="mut" style="margin-top:24px">AI 이미지는 참고용이며 실제와 다를 수 있습니다. 가구 치수·간격·가격은 일반 가정값이며 실측과 판매처 가격으로 확인하세요. 상품 링크는 각 쇼핑몰의 검색 링크로, 제휴 승인 전이라 수수료가 없는 임시 링크입니다. 제휴가 시작되면 화면 상단과 견적서에 대가성 문구를 표시합니다.</p>
 </main>
-<script src="layout.js?v=1791852344"></script>
-<script src="samples.js?v=1791852344"></script>
-<script src="editor.js?v=1791852344"></script>
-<script src="board.js?v=1791852344"></script>
-<script src="vendor/three.min.js?v=1791852344" onerror="var s=document.createElement('script');s.src='https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js';document.head.appendChild(s)"></script>
-<script src="scene_logic.js?v=1791852344"></script>
-<script src="scene3d.js?v=1791852344"></script>
-<script src="views3d.js?v=1791852344"></script>
+<script src="layout.js?v=1794227298"></script>
+<script src="samples.js?v=1794227298"></script>
+<script src="styles.js?v=1794227298"></script>
+<script src="editor.js?v=1794227298"></script>
+<script src="board.js?v=1794227298"></script>
+<script src="vendor/three.min.js?v=1794227298" onerror="var s=document.createElement('script');s.src='https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js';document.head.appendChild(s)"></script>
+<script src="scene_logic.js?v=1794227298"></script>
+<script src="scene3d.js?v=1794227298"></script>
+<script src="views3d.js?v=1794227298"></script>
 <script src="samples.local.js" onerror="this.remove()"></script>
 <script>
 // 방문·이용 측정(기본 꺼짐). 쿠키 없이 세는 서비스(예: GoatCounter)의 주소를 넣으면 켜집니다.
@@ -363,7 +365,7 @@ function renderPhotoMode() {
   const list = samplesFor(st.target);
   $("#sampleNote").textContent = `${E.TARGETS[st.target].label}에서 자주 쓰는 배치 3가지예요. 우리 집과 가장 비슷한 안을 골라주세요.`;
   $("#samples").innerHTML = list.map((x) => `<button type="button" class="card" data-sample="${esc(x.id)}" aria-pressed="${st.sampleId === x.id}">${x.img ? `<img src="${esc(exImg(x))}" alt="" data-alt="${esc(JSON.stringify([`samples/ex_${x.preset.target}_m_${st.shape || "std"}_${x.id.slice(-1)}.jpg`, x.img]))}" onerror="var a=JSON.parse(this.dataset.alt||'[]'),n=a.shift();if(n){this.dataset.alt=JSON.stringify(a);this.src=n}" style="width:100%;height:84px;object-fit:cover;border-radius:8px;margin-bottom:4px">` : `<div class="thumbfb" style="height:84px;margin-bottom:4px;overflow:hidden">${x.thumb}</div>`}<b>${esc(x.label)}</b><small>${esc(x.desc)}</small></button>`).join("");
-  $("#sampleCredit").textContent = "";
+  $("#sampleCredit").textContent = ""; renderStyleBox();
 }
 function applySample(x) {
   const p = x.preset;
@@ -440,7 +442,7 @@ function shot() {
   const data = cv.toDataURL("image/jpeg", 0.72);
   if (camTarget.type === "quote") { closeCam(); swapQuotePhoto(camTarget.id, data); track("quote-photo-camera"); return; }
   st.ownPhoto = data; st.photo = data; st.sampleId = null;
-  const img = $("#preview"); img.src = st.photo; img.hidden = false; closeCam(); track("own-photo-camera");
+  const img = $("#preview"); img.src = st.photo; img.hidden = false; renderStyleBox(); closeCam(); track("own-photo-camera");
 }
 // 맨 위 비교 이미지: 실사(AI 변환 이미지) ↔ 3D 모형(같은 방을 3D로 그린 것)
 let HERO3D = null;
@@ -491,7 +493,7 @@ function compress(file) {
 const onPhotoFile = async (e) => {
   const f = e.target.files[0]; if (!f) return;
   st.ownPhoto = await compress(f); st.photo = st.ownPhoto; st.sampleId = null; track("own-photo");
-  const img = $("#preview"); if (st.photo) { img.src = st.photo; img.hidden = false; }
+  const img = $("#preview"); if (st.photo) { img.src = st.photo; img.hidden = false; } renderStyleBox();
 };
 $("#photo").addEventListener("change", onPhotoFile); $("#photoCapture").addEventListener("change", onPhotoFile);
 
@@ -512,6 +514,31 @@ async function composeBoard(photoSrc, placed) {
   if (!d.image) throw new Error(d.error || "생성에 실패했어요.");
   track("compose-ok"); return "data:image/jpeg;base64," + d.image;
 }
+// 사진의 구조는 유지하고 선택한 스타일로 AI가 리디자인한다(서버 함수의 redesign 모드, 프롬프트는 서버 허용 목록)
+async function composeRedesign(photoSrc, styleId) {
+  if (!COMPOSE_URL) throw new Error("AI 서버가 연결되지 않았어요.");
+  const form = new FormData(), pr = await resizeBlob(photoSrc, 768); form.append("photo", pr.b, "room.jpg"); form.append("mode", "redesign"); form.append("style", styleId);
+  const r = await fetch(COMPOSE_URL, { method: "POST", body: form }), d = await r.json();
+  if (!d.image) throw new Error(d.error || "생성에 실패했어요.");
+  track("redesign-ok-" + styleId); return { src: "data:image/jpeg;base64," + d.image, aspect: pr.w / pr.h };
+}
+let styleFor = null; // 결과가 어느 사진의 것인지(사진이 바뀌면 결과를 지운다)
+function renderStyleBox() {
+  const box = $("#styleBox"); box.hidden = !st.photo || !COMPOSE_URL; if (box.hidden) return;
+  if (!box.firstChild) box.innerHTML = `<h3 style="margin-top:14px">AI로 스타일 바꿔보기</h3><p class="mut">방 구조(창·문·붙박이장)는 그대로 두고 가구와 분위기만 바꿔요.</p><div class="row" id="styleChips" style="flex-wrap:wrap;gap:6px">${RedesignStyles.list.map((x) => `<button type="button" class="card" data-style="${x.id}" aria-pressed="false" style="padding:6px 10px"><b>${x.emoji} ${esc(x.label)}</b><small>${esc(x.desc)}</small></button>`).join("")}</div><button type="button" class="cta off" id="styleGo">스타일을 골라주세요</button><div id="styleOut"></div>`;
+  if (styleFor !== st.photo) { styleFor = st.photo; $("#styleOut").innerHTML = ""; }
+}
+$("#styleBox").addEventListener("click", async (e) => {
+  const chip = e.target.closest("[data-style]"), go = e.target.closest("#styleGo");
+  if (chip) { st.styleId = chip.dataset.style; document.querySelectorAll("#styleChips [data-style]").forEach((b) => b.setAttribute("aria-pressed", b === chip)); const g = $("#styleGo"); g.classList.remove("off"); g.textContent = "이 스타일로 바꿔보기"; return; }
+  if (!go || !st.styleId || go.disabled) return;
+  const out = $("#styleOut"), photo = st.photo; go.disabled = true; out.innerHTML = '<p class="mut">AI가 방을 리디자인하는 중이에요(약 10~30초)…</p>';
+  try {
+    const r = await composeRedesign(photo, st.styleId);
+    if (st.photo === photo) out.innerHTML = `<div style="position:relative;line-height:0"><img src="${r.src}" alt="AI 스타일 리디자인" style="width:100%;aspect-ratio:${r.aspect};object-fit:fill;border-radius:10px"><span style="position:absolute;right:8px;bottom:8px;background:rgba(0,0,0,.55);color:#fff;border-radius:6px;padding:2px 6px;font-size:12px;line-height:1.4">✦ AI 생성</span></div><p class="mut">AI가 만든 예시예요. 실제 방 구조·가구와 다를 수 있고, 없던 창이나 물건이 생길 수 있어요.</p>`;
+  } catch (err) { out.innerHTML = `<p class="mut">${esc(err.message)} 잠시 후 다시 시도해주세요.</p>`; track("redesign-fail"); }
+  go.disabled = false;
+});
 // 3D 장면 이미지를 AI가 실사 사진처럼 바꾼다(서버 함수의 restyle 모드)
 async function composeRestyle(dataUrl, view) {
   if (!COMPOSE_URL) throw new Error("AI 서버가 연결되지 않았어요.");
