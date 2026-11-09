@@ -155,11 +155,18 @@
 
   /* ---------- 구매 연결(판매처) ----------
    * 지금은 모두 수수료가 없는 검색 링크(임시). 제휴 프로그램 조건·수수료는 docs/RESEARCH_housing_and_monetization.md 참고. */
+  // 제휴(링크프라이스) 설정: affiliate.json = { "a": "내 제휴 ID", "m": { "gmarket": "머천트ID" } } — 비어 있으면 수수료 없는 일반 검색 링크.
+  // ponytail: 딥링크 형식(click.linkprice.com ... tu=)은 링크프라이스 딥링크 변환 화면 결과와 대조해 확인 필요.
+  const AFF = { a: "", m: {} };
+  const setAffiliate = (c) => { AFF.a = (c && c.a) || ""; AFF.m = (c && c.m) || {}; };
+  const isAff = (id) => !!(AFF.a && AFF.m[id]);
+  const wrap = (id, url) => isAff(id) ? "https://click.linkprice.com/click.php?m=" + encodeURIComponent(AFF.m[id]) + "&a=" + encodeURIComponent(AFF.a) + "&l=0000&l_cd1=3&l_cd2=0&tu=" + encodeURIComponent(url) : url;
   const MERCHANTS = [
-    { id: "coupang", label: "쿠팡", url: (q) => "https://www.coupang.com/np/search?q=" + encodeURIComponent(q) },
-    { id: "naver", label: "네이버쇼핑", url: (q) => "https://search.shopping.naver.com/search/all?query=" + encodeURIComponent(q) },
-    { id: "ohou", label: "오늘의집", url: (q) => "https://ohou.se/productions/feed?query=" + encodeURIComponent(q) },
-  ];
+    { id: "coupang", label: "쿠팡", base: (q) => "https://www.coupang.com/np/search?q=" + encodeURIComponent(q) },
+    { id: "naver", label: "네이버쇼핑", base: (q) => "https://search.shopping.naver.com/search/all?query=" + encodeURIComponent(q) },
+    { id: "ohou", label: "오늘의집", base: (q) => "https://ohou.se/productions/feed?query=" + encodeURIComponent(q) },
+    { id: "gmarket", label: "G마켓", base: (q) => "https://browse.gmarket.co.kr/search?keyword=" + encodeURIComponent(q) },
+  ].map((m) => Object.assign(m, { url: (q) => wrap(m.id, m.base(q)) }));
 
   // 구매 품목 (가격은 임의 가정 범위 — 상품 연결 후 실제 가격으로 대체)
   const ITEM = {
@@ -814,7 +821,7 @@
   }
 
   const api = { PAD, ROOM_SHRINK, PYEONG, HOUSING, APT_STRUCTURES, APT_ERAS, aptPlanDefault, TARGETS, SHAPES, SIZE_OPTIONS, DEFAULT_SIZES, TARGET_DEFAULTS,
-    WALLS, BIG_WALLS, DOOR_POS, DEFAULT_VIEW, MERCHANTS, FIXED_PROMPT, ITEM,
+    WALLS, BIG_WALLS, DOOR_POS, DEFAULT_VIEW, MERCHANTS, setAffiliate, isAff, FIXED_PROMPT, ITEM,
     WIN_SIZES, OBSTACLES, CORNERS, roomFor, ROOM_SIZES, roomBySize, suggestSizes, candidates, currentScene, anyApplicable, suggestions, buildQuote, svg, score, planPurchase, usableRoom };
   if (typeof module !== "undefined" && module.exports) module.exports = api;
   else root.LayoutEngine = api;

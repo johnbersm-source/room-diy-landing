@@ -141,6 +141,7 @@ textarea{width:100%;font:12px/1.5 ui-monospace,monospace;background:var(--bg);co
       <div id="heroPins"></div><div class="heroBadge" id="heroBadge" hidden></div>
     </div>
     <div class="segs c2" id="heroMode" style="margin-bottom:10px"><button type="button" data-hero="photo" aria-pressed="true">실사로 보기</button><button type="button" data-hero="3d" aria-pressed="false">3D로 보기</button></div>
+    <button type="button" class="cta" id="heroLook" style="margin-top:0">🔄 실사로 360° 둘러보기</button>
     <button type="button" class="cta ghost" id="heroOrbit" style="margin-top:0">🔄 3D로 직접 돌려보기</button>
     <div class="starts">
       <button type="button" class="start pri" data-start="sample"><b>⚡ 1분 만에 우리 방 꾸며보기</b><small>사진 없이, 방 종류·크기만 고르면 Before/After와 구매 리스트가 나와요</small></button>
@@ -209,17 +210,17 @@ textarea{width:100%;font:12px/1.5 ui-monospace,monospace;background:var(--bg);co
   </div>
   <div id="out"></div>
   <section id="quote" hidden></section>
-  <p class="mut" style="margin-top:24px">AI 이미지는 참고용이며 실제와 다를 수 있습니다. 가구 치수·간격·가격은 일반 가정값이며 실측과 판매처 가격으로 확인하세요. 상품 링크는 각 쇼핑몰의 검색 링크로, 제휴 승인 전이라 수수료가 없는 임시 링크입니다. 제휴가 시작되면 화면 상단과 견적서에 대가성 문구를 표시합니다.</p>
+  <p class="mut" id="affNote" style="margin-top:24px">AI 이미지는 참고용이며 실제와 다를 수 있습니다. 가구 치수·간격·가격은 일반 가정값이며 실측과 판매처 가격으로 확인하세요. 상품 링크는 각 쇼핑몰의 검색 링크로, 제휴 승인 전이라 수수료가 없는 임시 링크입니다. 제휴가 시작되면 화면 상단과 견적서에 대가성 문구를 표시합니다.</p>
 </main>
-<script src="layout.js?v=1794227298"></script>
-<script src="samples.js?v=1794227298"></script>
-<script src="styles.js?v=1794227298"></script>
-<script src="editor.js?v=1794227298"></script>
-<script src="board.js?v=1794227298"></script>
-<script src="vendor/three.min.js?v=1794227298" onerror="var s=document.createElement('script');s.src='https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js';document.head.appendChild(s)"></script>
-<script src="scene_logic.js?v=1794227298"></script>
-<script src="scene3d.js?v=1794227298"></script>
-<script src="views3d.js?v=1794227298"></script>
+<script src="layout.js?v=1794230118"></script>
+<script src="samples.js?v=1794230118"></script>
+<script src="styles.js?v=1794230118"></script>
+<script src="editor.js?v=1794230118"></script>
+<script src="board.js?v=1794230118"></script>
+<script src="vendor/three.min.js?v=1794230118" onerror="var s=document.createElement('script');s.src='https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js';document.head.appendChild(s)"></script>
+<script src="scene_logic.js?v=1794230118"></script>
+<script src="scene3d.js?v=1794230118"></script>
+<script src="views3d.js?v=1794230118"></script>
 <script src="samples.local.js" onerror="this.remove()"></script>
 <script>
 // 방문·이용 측정(기본 꺼짐). 쿠키 없이 세는 서비스(예: GoatCounter)의 주소를 넣으면 켜집니다.
@@ -473,6 +474,27 @@ function renderHeroPins() {
 }
 $("#heroPins").addEventListener("click", (e) => { const p = e.target.closest("[data-pin]"); if (p && REG[p.dataset.pin]) { Editor.showItem(REG[p.dataset.pin]); track("hero-pin"); } });
 $("#heroOrbit").addEventListener("click", () => { if (!Views3D.ok()) { alert("이 기기에서는 3D를 쓸 수 없어요."); return; } try { const h = heroScene(); openOrbit(h.b, h.ao, "거실 예시를 돌려보세요"); track("hero-orbit"); } catch (e) { alert("3D를 불러오지 못했어요. 새로고침해 주세요."); } });
+// 실사 360° 둘러보기: 8방향 AI 변환 사진(look_{before|after}_{0..7}.jpg)을 좌우로 끌어 넘겨본다
+function openLook() {
+  let m = document.getElementById("lookModal");
+  if (!m) { m = document.createElement("div"); m.id = "lookModal"; m.style.cssText = "position:fixed;inset:0;background:rgba(0,0,0,.6);z-index:60;display:flex;align-items:center;justify-content:center"; document.body.appendChild(m); }
+  let k = 0, w = "after", x0 = null, k0 = 0;
+  m.innerHTML = `<div style="background:var(--bg);color:var(--fg);width:100%;max-width:640px;max-height:96vh;overflow:auto;border-radius:16px;padding:12px">
+    <h3 style="margin:0 0 6px">거실 360° 둘러보기</h3>
+    <div id="lkStage" style="position:relative;aspect-ratio:4/3;overflow:hidden;border-radius:10px;touch-action:pan-y;background:#ddd;cursor:grab"><img id="lkImg" alt="거실 둘러보기" draggable="false" style="width:100%;height:100%;object-fit:fill;display:block;pointer-events:none"><span class="heroBadge" style="right:8px;bottom:8px;left:auto">✦ AI 생성 예시</span></div>
+    <p class="mut" style="margin:6px 0">좌우로 끌면 방을 돌아봐요. (${"8"}방향)</p>
+    <div class="segs c2"><button type="button" data-lw="before">Before</button><button type="button" data-lw="after" aria-pressed="true">After</button></div>
+    <div class="row"><button class="cta ghost" type="button" data-lc="1">닫기</button></div></div>`;
+  const img = m.querySelector("#lkImg"), st = m.querySelector("#lkStage");
+  const show = () => { img.src = `samples/look_${w}_${((k % 8) + 8) % 8}.jpg`; m.querySelectorAll("[data-lw]").forEach((b) => b.setAttribute("aria-pressed", b.dataset.lw === w)); };
+  show(); for (let i = 0; i < 8; i++) { new Image().src = `samples/look_after_${i}.jpg`; }
+  st.onpointerdown = (e) => { x0 = e.clientX; k0 = k; try { st.setPointerCapture(e.pointerId); } catch (er) {} };
+  st.onpointermove = (e) => { if (x0 == null) return; const nk = k0 - Math.round((e.clientX - x0) / (st.clientWidth / 6)); if (nk !== k) { k = nk; show(); } };
+  st.onpointerup = st.onpointercancel = () => { x0 = null; };
+  m.onclick = (e) => { const b = e.target.closest("[data-lw]"); if (b) { w = b.dataset.lw; show(); return; } if (e.target === m || e.target.closest("[data-lc]")) { m.remove(); } };
+  track("hero-look");
+}
+$("#heroLook").addEventListener("click", openLook);
 $("#heroMode").addEventListener("click", (e) => { const b = e.target.closest("button[data-hero]"); if (b) heroMode(b.dataset.hero); });
 $("#baRange").addEventListener("input", (e) => { const v = Number(e.target.value); $("#baBefore").style.clipPath = `inset(0 ${100 - v}% 0 0)`; $("#baLine").style.left = v + "%"; });
 const showCustomWon = () => { $("#customBudgetWon").textContent = st.budget > 0 ? `= ${won(st.budget)}` : ""; };
@@ -500,6 +522,7 @@ $("#photo").addEventListener("change", onPhotoFile); $("#photoCapture").addEvent
 /* ---------- 결과와 견적서 ---------- */
 let LAST = null;
 // 가격 조사 결과(prices.json)가 있으면 가정 범위 대신 사용한다(없으면 가정 범위 그대로).
+fetch("affiliate.json").then((r) => r.ok ? r.json() : null).then((c) => { if (!c) return; E.setAffiliate(c); if (E.MERCHANTS.some((m) => E.isAff(m.id))) $("#affNote").textContent = "AI 이미지는 참고용이며 실제와 다를 수 있습니다. 가구 치수·간격·가격은 일반 가정값이며 실측과 판매처 가격으로 확인하세요. [대가성 광고] 일부 구매 링크는 제휴 링크로, 이를 통해 구매하면 이 서비스가 소정의 수수료를 지급받습니다(구매 가격은 같습니다)."; }).catch(() => {});
 fetch("prices.json").then((r) => r.ok ? r.json() : null).then((d) => { if (!d || !d.items) return;
   Object.entries(d.items).forEach(([k, v]) => { if (E.ITEM[k]) { E.ITEM[k].price = [v[0], v[1]]; E.ITEM[k].priceNote = `${d.date} ${d.label || "조사"}`; } }); }).catch(() => {});
 // 사진 합성(AI) 서버 함수 주소. 배포 후 여기에 넣는다(workers/compose). 비어 있으면 버튼이 나타나지 않는다.
