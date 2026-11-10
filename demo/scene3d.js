@@ -97,6 +97,10 @@
     }
     const t = new T.CanvasTexture(c); t.wrapS = t.wrapT = T.RepeatWrapping; t.encoding = T.sRGBEncoding; t.anisotropy = 4; return t;
   }
+  let _aoR = null, _aoL = null, _plaster = null;
+  function aoRadial() { if (_aoR) return _aoR; const c = document.createElement("canvas"); c.width = c.height = 128; const x = c.getContext("2d"), g = x.createRadialGradient(64, 64, 8, 64, 64, 64); g.addColorStop(0, "rgba(30,22,14,.85)"); g.addColorStop(0.6, "rgba(30,22,14,.35)"); g.addColorStop(1, "rgba(40,30,20,0)"); x.fillStyle = g; x.fillRect(0, 0, 128, 128); return (_aoR = new T.CanvasTexture(c)); }
+  function aoLinear() { if (_aoL) return _aoL; const c = document.createElement("canvas"); c.width = 4; c.height = 64; const x = c.getContext("2d"), g = x.createLinearGradient(0, 0, 0, 64); g.addColorStop(0, "rgba(50,36,22,.6)"); g.addColorStop(1, "rgba(60,45,30,0)"); x.fillStyle = g; x.fillRect(0, 0, 4, 64); return (_aoL = new T.CanvasTexture(c)); }
+  function plasterTex() { if (_plaster) return _plaster; const c = document.createElement("canvas"); c.width = c.height = 256; const x = c.getContext("2d"); x.fillStyle = "#f1ece3"; x.fillRect(0, 0, 256, 256); for (let i = 0; i < 2600; i++) { const v = 225 + Math.floor(Math.random() * 26); x.fillStyle = `rgba(${v},${v - 4},${v - 10},.35)`; x.fillRect(Math.random() * 256, Math.random() * 256, 2, 2); } const t = new T.CanvasTexture(c); t.wrapS = t.wrapT = T.RepeatWrapping; t.repeat.set(4, 2); t.encoding = T.sRGBEncoding; return (_plaster = t); }
   let _plank = null;
   function textSprite(text, w, h, color) {
     const c = document.createElement("canvas"); c.width = 512; c.height = Math.round(512 * h / w); const x = c.getContext("2d");
@@ -115,7 +119,7 @@
     const g = new T.Group(); _plank = _plank || plankTexture();
     const fl = _plank.clone(); fl.needsUpdate = true; fl.repeat.set(U.W / 150, U.D / 150);
     const floor = new T.Mesh(new T.PlaneGeometry(U.W, U.D), new T.MeshStandardMaterial({ map: fl, roughness: 0.55, metalness: 0 })); floor.rotation.x = -Math.PI / 2; floor.position.set(U.W / 2, 0, U.D / 2); floor.receiveShadow = true; g.add(floor);
-    const wallMat = M(0xf1ece3, 0.95), TH = 6;
+    const wallMat = new T.MeshStandardMaterial({ map: plasterTex(), roughness: 0.95, metalness: 0 }), TH = 6;
     const wall = (w, h, d, x, y, z, layer) => { const m = new T.Mesh(new T.BoxGeometry(w, h, d), wallMat); m.position.set(x, y, z); m.receiveShadow = true; if (layer != null) m.layers.set(layer); g.add(m); return m; };
     if (doll) { // 돌려보기용: 안쪽을 향한 벽 4개(바깥에서 보면 가까운 벽은 사라져 방 안이 보인다)
       const pw = (w, x, z, ry) => { const m = new T.Mesh(new T.PlaneGeometry(w, WALL_H), wallMat); m.position.set(x, WALL_H / 2, z); m.rotation.y = ry; m.receiveShadow = true; g.add(m); };
@@ -126,6 +130,9 @@
       wall(TH, WALL_H, U.D, U.W + TH / 2, WALL_H / 2, U.D / 2);
       wall(U.W + TH * 2, WALL_H, TH, U.W / 2, WALL_H / 2, U.D + TH / 2, 1); // 위에서 볼 때만
     }
+    // 벽과 바닥이 만나는 곳의 부드러운 그늘(간접광 흉내)
+    const strip = (len, x, z, ry) => { const m = new T.Mesh(new T.PlaneGeometry(len, 55), new T.MeshBasicMaterial({ map: aoLinear(), transparent: true, depthWrite: false })); m.rotation.x = -Math.PI / 2; m.rotation.z = ry; m.position.set(x, 0.25, z); g.add(m); };
+    strip(U.W, U.W / 2, 19, 0); strip(U.D, 19, U.D / 2, Math.PI / 2); strip(U.D, U.W - 19, U.D / 2, -Math.PI / 2);
     // 걸레받이
     const bb = M(0xffffff, 0.7), base = (w, d, x, z) => { const m = new T.Mesh(new T.BoxGeometry(w, 8, d), bb); m.position.set(x, 4, z); m.receiveShadow = true; g.add(m); };
     base(U.W, 1.6, U.W / 2, 0.8); base(1.6, U.D, 0.8, U.D / 2); base(1.6, U.D, U.W - 0.8, U.D / 2);
@@ -160,12 +167,12 @@
   }
   function newScene(U, windows, door, bg, doll) {
     const sc = new T.Scene(); sc.background = lin(bg);
-    sc.add(new T.HemisphereLight(0xfff6ea, 0xb5a591, 0.62));
+    sc.add(new T.HemisphereLight(0xfff6ea, 0xb5a591, 0.5)); const fill = new T.PointLight(0xfff3e0, 0.35, 0, 2); fill.position.set(U.W / 2, WALL_H - 20, U.D / 2); sc.add(fill);
     // 창 쪽에서 들어오는 부드러운 햇빛(그림자가 생긴다). 창이 없으면 위에서
     const win = (windows || [])[0], cx = U.W / 2, cz = U.D / 2, dl = new T.DirectionalLight(0xfff1dc, 0.95);
     const from = win ? (win.wall === "far" ? [cx + U.W * 0.15, 330, -260] : win.wall === "left" ? [-260, 330, cz - U.D * 0.15] : [U.W + 260, 330, cz - U.D * 0.15]) : [cx, 520, cz + 60];
     dl.position.set(from[0], from[1], from[2]); dl.target.position.set(cx, 0, cz); sc.add(dl); sc.add(dl.target);
-    dl.castShadow = true; dl.shadow.mapSize.set(1024, 1024); const R = Math.max(U.W, U.D) * 0.85; Object.assign(dl.shadow.camera, { left: -R, right: R, top: R, bottom: -R, near: 50, far: 1400 }); dl.shadow.bias = -0.0006; dl.shadow.radius = 4; dl.shadow.camera.updateProjectionMatrix();
+    dl.castShadow = true; dl.shadow.mapSize.set(2048, 2048); const R = Math.max(U.W, U.D) * 0.85; Object.assign(dl.shadow.camera, { left: -R, right: R, top: R, bottom: -R, near: 50, far: 1400 }); dl.shadow.bias = -0.0006; dl.shadow.radius = 4; dl.shadow.camera.updateProjectionMatrix();
     sc.add(buildRoom(U, windows, door, doll)); return sc;
   }
   // 모든 화면 공통: 부드러운 그림자·색 보정
@@ -190,6 +197,10 @@
     syncAttached(objs);
     objs.forEach((o) => {
       const g = buildModel(o); g.userData.isObj = true; placeGroup(g, o); sc.add(g);
+      if (o.mount === "floor" && o.type !== "pillar" && !(o.elev > 0) && Math.max(o.w, o.d) > 14) { // 가구 아래 접촉 그림자
+        const ao = new T.Mesh(new T.PlaneGeometry(o.w * 1.4, o.d * 1.4), new T.MeshBasicMaterial({ map: aoRadial(), transparent: true, depthWrite: false, opacity: 0.9 }));
+        ao.rotation.x = -Math.PI / 2; ao.rotation.z = (o.rot || 0); ao.position.set(o.cx, 0.35, o.cz); ao.userData.isObj = true; ao.userData.hideForAI = false; sc.add(ao);
+      }
       if (o.label && o.mount === "floor" && o.type !== "pillar" && Math.max(o.w, o.d) > 24) { // 위에서 볼 때만 보이는 이름표
         const lw = Math.min(Math.max(o.w, o.d) * 1.05, 150), lb = textSprite(String(o.label).replace(/\(.*\)/, "").trim(), lw, lw * 0.3, "#2b2b2f");
         lb.position.set(o.cx, (o.elev || 0) + (o.h || 0) + 2, o.cz); lb.layers.set(1); lb.userData.isObj = true; lb.userData.label = true; lb.userData.hideForAI = true; sc.add(lb);
@@ -296,7 +307,7 @@
       m.querySelector("#s3Undo").disabled = !hist.canUndo(); m.querySelector("#s3Redo").disabled = !hist.canRedo();
       m.querySelector("#s3Chk").innerHTML = (() => { const ck = L.checksOf(objs, U, opts.room.door); return (ck.length ? ck : [{ level: "ok", msg: "겹침·문 열림 공간 문제 없음(간단 점검)" }]).map((k) => `<li class="${k.level}">${esc(k.msg)}</li>`).join(""); })();
       const plus = (n) => { const v = Math.round(n / 1000) * 1000; return "+" + (v >= 10000 ? (v % 10000 === 0 ? v / 10000 : (v / 10000).toFixed(1)) + "만원" : v.toLocaleString("ko-KR") + "원"); };
-      const th = (k) => `<img src="items/${esc(k)}.jpg" alt="" style="width:100%;aspect-ratio:1;object-fit:cover;border-radius:8px;background:#fff;display:block" onerror="this.style.display='none'">`;
+      const th = (k) => `<img src="items/${esc(k)}.photo.jpg" alt="" style="width:100%;aspect-ratio:1;object-fit:cover;border-radius:8px;background:#fff;display:block" onerror="this.style.display='none'">`;
       m.querySelector("#s3Placed").innerHTML = objs.filter((x) => !x.base && x.key && x.mount !== undefined).map((x) => `<button type="button" class="s3card" data-rm="${esc(x.id)}" aria-pressed="${x.id === sel}">${th(x.key)}<span>${esc(x.label)}</span><i>✕</i></button>`).join("") || '<span class="mut">추가한 제품이 없어요</span>';
       const man = (n) => (n >= 10000 ? (n / 10000).toFixed(n % 10000 ? 1 : 0) + "만원" : n.toLocaleString("ko-KR") + "원");
       m.querySelector("#s3Vers").innerHTML = vers.list().map((v, i) => `<button type="button" class="s3card" style="width:132px" data-ver="${i}"><img src="${v.thumb}" alt="" style="width:100%;border-radius:8px;display:block"><span>${esc(v.name)}</span><b>추가 ${man(v.total)}</b><span style="font-size:11px;color:${v.issues ? "#b25b00" : "inherit"}">${v.issues ? "점검 " + v.issues + "건" : "문제 없음"}</span><i data-verx="${i}">✕</i></button>`).join("") || '<span class="mut">보관한 배치가 없어요</span>';

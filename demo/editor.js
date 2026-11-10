@@ -55,12 +55,12 @@
   function showItem(it, links) {
     const m = ensureModal();
     m.innerHTML = `<div style="background:var(--bg);color:var(--fg);width:100%;max-width:560px;max-height:88vh;overflow:auto;border-radius:16px 16px 0 0;padding:18px">
-      <div style="text-align:center">${icon(it.key, 96)}</div>
+      <div style="text-align:center;position:relative"><img src="${esc(it.photo || "items/" + it.key + ".photo.jpg")}" alt="${esc(it.name)}" style="width:min(240px,70%);aspect-ratio:1;object-fit:cover;border-radius:12px;background:#fff" onerror="this.outerHTML=this.dataset.fb" data-fb="${esc(icon(it.key, 96))}">${it.photo ? "" : '<span style="display:block;font-size:11px;color:var(--mut)">✦ AI가 만든 예시 사진</span>'}</div>
       <h3 style="margin:6px 0 2px;text-align:center">${esc(it.name)}</h3>
       <p class="mut" style="text-align:center;margin:0">${esc(it.size)}</p>
       <p style="text-align:center;margin:8px 0"><b>${won(it.price[0])} ~ ${won(it.price[1])}</b> <span class="mut">${esc(it.priceNote || "임시 가정 범위")}</span></p>
       ${TREND[it.key] ? `<p style="text-align:center;margin:4px 0"><span class="tag" style="color:var(--acc)">2026 트렌드 · ${esc(TREND[it.key])}</span></p>` : ""}
-      <p class="mut">그림은 품목을 설명하는 일러스트예요. 실제 제품 사진·색·모양은 판매처에서 확인하세요(제품 사진 연동은 준비 중).</p>
+      <p class="mut">${it.photo ? "판매처가 제공한 제품 이미지예요." : "AI가 만든 예시 사진이라 실제 판매 제품의 모양·색·크기와 달라요. 실제 제품은 아래 판매처에서 확인하세요."}</p>
       <details><summary>직접 하는 방법 · ${esc(it.diff)} · 약 ${it.min}분 · 준비물 ${esc(it.tools)}</summary><ol>${it.steps.map((s) => `<li>${esc(s)}</li>`).join("")}</ol></details>
       <div class="qlinks" style="margin-top:10px">${(links || it.links || []).map((l, k) => `<a ${k === 0 ? 'class="pri"' : ""} href="${esc(l.url)}" target="_blank" rel="noopener" data-click="${esc(it.key)}" data-m="${esc(l.id || "")}">${esc(l.label)}에서 보기</a>`).join("")}</div>
       <button class="cta ghost" type="button" data-closemodal style="margin-top:10px">닫기</button></div>`;
@@ -122,7 +122,7 @@
     forced = forced || []; const A = mode === "quote" ? { add: "data-qaddx", del: "data-qdelx", combo: "data-qcombo" } : { add: "data-addx", del: "data-delx", combo: "data-combo" };
     const added = purchase.inBudget.filter((i) => forced.includes(i.key)), over = purchase.over;
     if (!over.length && !added.length) return "";
-    const thumb = (k) => `<img src="items/${esc(k)}.jpg" alt="" width="40" height="40" style="width:40px;height:40px;object-fit:cover;border-radius:8px;background:#fff;flex:none" onerror="this.style.display='none'">`;
+    const thumb = (k) => `<img src="items/${esc(k)}.photo.jpg" alt="" width="40" height="40" style="width:40px;height:40px;object-fit:cover;border-radius:8px;background:#fff;flex:none" onerror="this.style.display='none'">`;
     const cs = combos(over);
     return `<div class="sug"><b>예산을 더하면 이렇게 꾸밀 수 있어요</b>
       ${added.length ? `<div class="mut" style="margin:4px 0">고른 것: ${added.map((i) => `<button type="button" class="fb" ${A.del}="${esc(i.key)}" style="padding:4px 8px">${esc(i.name)} ${plus(i.mid)} ✕</button>`).join(" ")}</div>` : ""}
