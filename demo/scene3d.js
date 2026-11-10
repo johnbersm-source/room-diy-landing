@@ -220,6 +220,15 @@
     if (clean) hideAI(sc, true); r.render(sc, cam); const url = r.domElement.toDataURL("image/jpeg", 0.9); disposeScene(sc); return url;
   }
 
+  // 방 가장자리를 따라 돌며 방 한가운데를 보는 사진(360° 둘러보기용). a = 0..2π, 반대편 벽과 가구가 한눈에 들어온다.
+  function aroundSnapshot(room, objs, a, w, h, clean) {
+    w = w || 640; h = h || 480; const r = sharedRenderer(w, h), U = room.U, sc = newScene(U, room.windows, room.door, FRONT_BG);
+    fillScene(sc, objs.map((o) => Object.assign({}, o)));
+    const cam = new T.PerspectiveCamera(80, w / h, 5, 3000), cx = U.W / 2, cz = U.D / 2, k = 0.86;
+    cam.position.set(cx - Math.sin(a) * (U.W / 2 - 25) * k, 165, cz + Math.cos(a) * (U.D / 2 - 25) * k); cam.lookAt(cx, 85, cz); cam.layers.enable(1); cam.layers.enable(2);
+    if (clean) hideAI(sc, true); r.render(sc, cam); const url = r.domElement.toDataURL("image/jpeg", 0.9); disposeScene(sc); return url;
+  }
+
   /* ---------- 편집 화면 ---------- */
   const esc = (v) => String(v).replace(/[&<>"']/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" }[c]));
   function modal() {
@@ -446,5 +455,5 @@
     return { update, resize: size };
   }
 
-  root.Scene3D = { snapshot, lookSnapshot, openEditor, orbitView, buildModel, frontCamera, topCamera, lockView };
+  root.Scene3D = { snapshot, lookSnapshot, aroundSnapshot, openEditor, orbitView, buildModel, frontCamera, topCamera, lockView };
 })(typeof window !== "undefined" ? window : globalThis);
